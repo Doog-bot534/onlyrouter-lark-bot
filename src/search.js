@@ -35,9 +35,16 @@ function formatResults(items) {
   return body ? `以下是联网搜索到的参考信息（可能有噪声，请甄别）：\n\n${body}` : '';
 }
 
+// 取真实 key：过滤掉空值和 .env.example 里的占位符（xxxx），避免拿假 key 空跑一次请求。
+function realKey(name) {
+  const v = process.env[name];
+  if (!v || /x{3,}/i.test(v)) return '';
+  return v;
+}
+
 // firecrawl：每月 1000 免费额度，搜索 2 credits/10 条结果。v2 端点，结果按 source 分组。
 async function searchFirecrawl(query) {
-  const key = process.env.FIRECRAWL_API_KEY;
+  const key = realKey('FIRECRAWL_API_KEY');
   if (!key) return '';
   const res = await fetch('https://api.firecrawl.dev/v2/search', {
     method: 'POST',
@@ -51,7 +58,7 @@ async function searchFirecrawl(query) {
 }
 
 async function searchTavily(query) {
-  const key = process.env.TAVILY_API_KEY;
+  const key = realKey('TAVILY_API_KEY');
   if (!key) return '';
   const res = await fetch('https://api.tavily.com/search', {
     method: 'POST',
@@ -65,7 +72,7 @@ async function searchTavily(query) {
 }
 
 async function searchBrave(query) {
-  const key = process.env.BRAVE_API_KEY;
+  const key = realKey('BRAVE_API_KEY');
   if (!key) return '';
   const url = new URL('https://api.search.brave.com/res/v1/web/search');
   url.searchParams.set('q', query);
