@@ -6,10 +6,12 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "digest": "node -e \"import('./src/feedback.js').then(m=>m.runDigestNow(process.argv[1]))\""
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.68.0",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "node-cron": "^4.6.0"
   }
 }

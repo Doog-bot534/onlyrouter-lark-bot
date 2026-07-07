@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    container_name: onlyrouter-lark-bot
+    restart: always
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      # 挂载知识库目录，改文档后重启容器即可生效，无需重建镜像
+      - ./knowledge:/app/knowledge:ro

@@ -12,6 +12,7 @@ import 'dotenv/config';
 import * as Lark from '@larksuiteoapi/node-sdk';
 import { askLLM } from './llm.js';
 import { reportBug, bugReportEnabled } from './bug-report.js';
+import { logQuestion, startDigestSchedule } from './feedback.js';
 
 const { LARK_APP_ID, LARK_APP_SECRET } = process.env;
 
@@ -83,6 +84,9 @@ async function handleQuestion(chatId, chatType, question) {
     const { answer, isBug, bugSummary } = await askLLM(question);
     await sendText(chatId, answer);
 
+    // 记录这条提问，供每日汇总反馈（无论是否 bug 都记）
+    logQuestion({ question, chatType, chatId, answer, isBug });
+
     // LLM 判定为产品 bug 时，转发到 OnlyRouter 内部群（如已配 Webhook）
     if (isBug && bugReportEnabled()) {
       await reportBug({ summary: bugSummary || answer.slice(0, 200), question, chatType });
@@ -92,7 +96,7 @@ async function handleQuestion(chatId, chatType, question) {
     // 把人话解释 + 原始报错都给出去，方便群里排查（小白也能截图问）
     let hint = '抱歉，出了点问题没能回答。';
     if (e.message.includes('401')) hint = '抱歉，机器人自己的 OnlyRouter Key 无效或过期了，麻烦管理员检查 .env 里的 ONLYROUTER_API_KEY。';
-    else if (e.message.includes('400')) hint = '抱歉，机器人请求模型时报了 400，可能是模型名配错了（检查 ONLYROUTER_MODEL，文本模型别填 -ab 结尾的）。';
+    else if (e.message.includes('400') || e.message.includes('404')) hint = '抱歉，机器人请求模型时报错了，可能是 ONLYROUTER_MODEL 填的模型名不对或该模型没开通，麻烦管理员检查。';
     else if (e.message.includes('未配置')) hint = '抱歉，机器人还没配置 OnlyRouter Key，请管理员填好 .env 再重启。';
     await sendText(chatId, `${hint}\n\n（技术细节：${e.message.slice(0, 300)}）`).catch(() => {});
   }
@@ -132,6 +136,9 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
 // ---- 启动长连接 ----
 wsClient.start({ eventDispatcher });
 console.log('✅ OnlyRouter Lark 机器人已启动（长连接模式），等待群消息…');
+
+// 启动每日提问汇总定时任务
+startDigestSchedule();
 
 // 优雅退出
 process.on('SIGINT', () => {

@@ -1,13 +1,22 @@
 # OnlyRouter Lark 机器人
 
-放进 Lark 群里的问答机器人：群里有人 **@ 它**，它就用 OnlyRouter 自家的 GPT-5.5 模型，结合产品教程文档和实时模型列表，解答 OnlyRouter 相关问题（怎么拿 Key、怎么配 VS Code / Codex、有哪些模型、报错怎么办……）。
+放进 Lark 群里的 AI 助手：群里有人 **@ 它**，它就用 OnlyRouter 平台的模型来解答问题、指导用 AI 提效，并把大家的提问定期汇总反馈给团队做产品迭代。
+
+## 三大能力
+
+1. **解答 OnlyRouter 使用问题** —— 注册、拿 Key、在 VS Code / Codex / Claude Code 里配置、模型选型、报错排查。依据 `knowledge/` 里的教程文档 + 实时拉取的模型列表回答，不靠模型瞎编。
+2. **指导用 AI 提效（FDE 助手）** —— 不限于写代码：写周报/邮件、整理表格、翻译、生成图片/语音、录音转文字等，给出能马上照做的方法和可直接抄的提示词。
+3. **信息反馈** —— 记录每条提问，**每天定时汇总**（热门问题/难点/改进建议）发到产品反馈群，帮团队做迭代；其中**判定为真 bug 的问题即时推到开发群**。
 
 ## 它是怎么工作的
 
-- **长连接模式**：不需要公网域名、不需要服务器回调地址。一台能上网的电脑或服务器，跑起来就行。
-- **知识来源**：把 `knowledge/` 目录下的教程文档 + 实时拉取的 `onlyrouter.ai` 模型列表，一起喂给大模型来回答。不靠模型自己瞎编。
-- **吃自家狗粮**：机器人自己也是调 OnlyRouter 的 `gpt-5.5` 来生成回答。
+- **长连接模式**：不需要公网域名、不需要服务器回调地址。一台能上网的机器，跑起来就行。
+- **知识来源**：`knowledge/` 目录下的教程文档 + 实时拉取的 `onlyrouter.ai` 模型列表，一起喂给大模型来回答。
+- **吃自家狗粮**：机器人自己也是调 OnlyRouter 的模型（默认 `gpt-5.5-ab`）来生成回答。
 - **群里 @ 才答**，单聊直接答，不打扰群聊。
+- **联网搜索**：预留接口，默认关闭（文档+模型知识已够用）；需要时在 `.env` 开 Tavily/Brave 即可。
+
+> ⚠️ 说明：通过 API 调用模型**不自带联网**（不像 ChatGPT 网页版）。裸调只用模型训练知识 + 本项目的文档。冷门问题若答不准，再开联网搜索。
 
 ---
 
@@ -67,18 +76,43 @@ npm start
 
 ---
 
-## 长期运行（关掉终端也不停）
+## 服务器部署（常驻运行）
 
-`npm start` 一关终端就停了。要让它常驻，用 pm2：
+`npm start` 一关终端就停。上服务器常驻，三选一：
+
+### 方式 A：一键脚本（Linux + systemd，推荐）
+
+```bash
+# 项目已上传/clone 到服务器后：
+cp .env.example .env && vim .env     # 填好凭证
+sudo bash deploy/deploy.sh
+```
+
+脚本自动：装 Node（如缺）→ 装依赖 → 注册 systemd 服务 → 开机自启 → 启动。之后：
+
+```bash
+journalctl -u onlyrouter-lark-bot -f        # 看实时日志
+systemctl restart onlyrouter-lark-bot       # 改了 .env 后重启
+systemctl stop onlyrouter-lark-bot          # 停止
+```
+
+### 方式 B：Docker
+
+```bash
+cp .env.example .env && vim .env
+docker compose up -d
+docker compose logs -f          # 看日志
+```
+
+提问记录持久化在 `./data`，知识库 `./knowledge` 挂载进容器，改文档后 `docker compose restart` 生效。
+
+### 方式 C：pm2（快速起，适合本机/测试）
 
 ```bash
 npm install -g pm2
 pm2 start src/index.js --name onlyrouter-lark-bot
-pm2 save          # 保存进程列表
-pm2 startup       # 跟着提示做一次，开机自启
+pm2 save && pm2 startup        # 开机自启（跟提示做一次）
 ```
-
-常用：`pm2 logs onlyrouter-lark-bot` 看日志，`pm2 restart onlyrouter-lark-bot` 重启。
 
 ---
 
@@ -87,7 +121,7 @@ pm2 startup       # 跟着提示做一次，开机自启
 机器人的回答依据放在 `knowledge/` 目录（`.md` 文档）和实时模型列表里：
 
 - **模型列表**自动从 `onlyrouter.ai/api/models` 拉取，10 分钟刷新一次，不用管。
-- **教程文档**：往 `knowledge/` 里加 / 改 `.md` 文件即可，重启机器人生效。文档越全，回答越准。
+- **教程文档 / AI 提效指南**：往 `knowledge/` 里加 / 改 `.md` 文件即可，重启机器人生效。文档越全，回答越准。
 
 ---
 
@@ -116,4 +150,28 @@ pm2 startup       # 跟着提示做一次，开机自启
 2. 把地址填到 `.env` 的 `LARK_BUG_WEBHOOK_URL`，重启机器人。
 
 留空则不上报。判定偏保守（拿不准就不报），避免误报刷屏。上报内容包含：用户原话、机器人的判断、来源和时间。
+
+---
+
+## 每日提问汇总反馈（可选）
+
+机器人记录每条提问（存在 `data/questions.jsonl`），**每天定时**用 LLM 汇总成一份产品反馈日报——热门问题、用户卡点、改进建议——发到你指定的产品反馈群，帮团队做迭代。这和上面的 bug 上报是两条线：bug 即时推开发群，汇总每天推产品群。
+
+开启方式：
+
+1. 在产品反馈群加个**自定义机器人**，复制 Webhook 地址，填到 `.env` 的 `LARK_FEEDBACK_WEBHOOK_URL`。
+2. 汇总时间默认每天 18:03（`FEEDBACK_DIGEST_CRON`，时区 Asia/Shanghai），可改。
+3. 重启生效。留空则汇总只打印到日志、不发送。
+
+手动立即汇总当天（测试用）：`npm run digest`
+
+---
+
+## 联网搜索（可选，默认关闭）
+
+通过 API 调模型是不自带联网的。默认靠 `knowledge/` 文档 + 模型知识回答，对 OnlyRouter 场景已够用。若发现冷门问题答不准，再开：
+
+1. 注册 [Tavily](https://tavily.com)（AI 搜索，有免费额度）或 Brave Search API，拿 key。
+2. `.env` 里设 `SEARCH_PROVIDER=tavily` + `TAVILY_API_KEY=...`（或 `brave` + `BRAVE_API_KEY`）。
+3. 重启。之后回答前会先联网检索、把结果一并喂给模型。
 

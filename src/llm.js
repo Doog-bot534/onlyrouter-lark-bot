@@ -2,6 +2,7 @@
 // 协议自适应：模型名以 -ab 结尾走 Anthropic 协议(/v1/messages)，其余走 OpenAI 协议(/v1/chat/completions)。
 //   这正是 OnlyRouter 的规则——-ab 模型是 Anthropic 协议专用，填进 OpenAI 端点会直接 400。
 import { buildSystemPrompt } from './knowledge.js';
+import { maybeSearch } from './search.js';
 
 const API_KEY = process.env.ONLYROUTER_API_KEY;
 const MODEL = process.env.ONLYROUTER_MODEL || 'gpt-5.5-ab';
@@ -17,10 +18,19 @@ export async function askLLM(question) {
     throw new Error('未配置 ONLYROUTER_API_KEY，请在 .env 里填上 OnlyRouter 的 Key');
   }
   const system = await buildSystemPrompt();
+  // 联网搜索（默认关闭，返回空串；启用后把搜索结果拼进用户问题）
+  const searchCtx = await maybeSearch(question);
+  const userMsg = searchCtx ? `${searchCtx}\n\n---\n\n用户问题：${question}` : question;
   const raw = isAnthropic
-    ? await callAnthropic(system, question)
-    : await callOpenAI(system, question);
+    ? await callAnthropic(system, userMsg)
+    : await callOpenAI(system, userMsg);
   return parseResult(raw);
+}
+
+// 通用纯文本对话（供每日汇总等内部功能复用，不走结构化解析）
+export async function chat(system, user) {
+  if (!API_KEY) throw new Error('未配置 ONLYROUTER_API_KEY');
+  return isAnthropic ? callAnthropic(system, user) : callOpenAI(system, user);
 }
 
 // Anthropic Messages 协议（-ab 模型走这条）
