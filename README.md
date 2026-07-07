@@ -171,7 +171,7 @@ pm2 save && pm2 startup        # 开机自启（跟提示做一次）
 
 通过 API 调模型是不自带联网的。默认靠 `knowledge/` 文档 + 模型知识回答，对 OnlyRouter 场景已够用。若发现冷门问题答不准，再开：
 
-1. 注册 [Tavily](https://tavily.com)（AI 搜索，有免费额度）或 Brave Search API，拿 key。
-2. `.env` 里设 `SEARCH_PROVIDER=tavily` + `TAVILY_API_KEY=...`（或 `brave` + `BRAVE_API_KEY`）。
+1. 注册 [Firecrawl](https://firecrawl.dev)（**每月 1000 免费额度，约 5000 条搜索结果/月，无需信用卡**，还能顺带抓整页内容），拿 `fc-` 开头的 key。也可用 [Tavily](https://tavily.com) 或 Brave Search。
+2. `.env` 里设 `SEARCH_PROVIDER=firecrawl` + `FIRECRAWL_API_KEY=...`（或 `tavily`/`brave` + 对应 key）。
 3. 重启。之后回答前会先联网检索、把结果一并喂给模型。
 

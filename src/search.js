@@ -1,9 +1,11 @@
 // 联网搜索接口（预留）。默认关闭——当前靠 knowledge/ 文档 + 模型训练知识回答已够用。
 // 以后若发现"文档答不上来"的冷门问题变多，接一个搜索服务即可：
-//   1) 在 .env 配 SEARCH_PROVIDER=tavily 和 TAVILY_API_KEY（或 brave + BRAVE_API_KEY）
-//   2) 取消下面对应实现的注释
-//   3) llm.js 里在构造问题前调用 maybeSearch(question)，把结果拼进上下文
-// 之所以先留接口不实装：避免为低频需求引入额外 key 和依赖，等真有需要 5 分钟就能接上。
+//   1) 在 .env 配 SEARCH_PROVIDER=firecrawl 和 FIRECRAWL_API_KEY（或 tavily / brave）
+//   2) llm.js 里已在构造问题前调用 maybeSearch(question)，把结果拼进上下文
+// 之所以先留接口不实装：避免为低频需求引入额外 key 和依赖，等真有需要改个 .env 就能接上。
+//
+// 推荐 firecrawl：每月 1000 免费额度（recurring，约 5000 条搜索结果/月），无需信用卡，
+//   且能顺带抓整页 markdown，读文档场景更准。tavily / brave 作为备选。
 const PROVIDER = process.env.SEARCH_PROVIDER || 'none';
 
 export function searchEnabled() {
@@ -15,6 +17,7 @@ export async function maybeSearch(query) {
   if (PROVIDER === 'none') return '';
 
   try {
+    if (PROVIDER === 'firecrawl') return await searchFirecrawl(query);
     if (PROVIDER === 'tavily') return await searchTavily(query);
     if (PROVIDER === 'brave') return await searchBrave(query);
     console.warn(`[search] 未知的 SEARCH_PROVIDER: ${PROVIDER}`);
@@ -23,6 +26,28 @@ export async function maybeSearch(query) {
     console.error('[search] 搜索失败，降级为不搜索:', e.message);
     return '';
   }
+}
+
+function formatResults(items) {
+  const body = items
+    .map((r, i) => `[${i + 1}] ${r.title}\n${r.snippet}\n来源：${r.url}`)
+    .join('\n\n');
+  return body ? `以下是联网搜索到的参考信息（可能有噪声，请甄别）：\n\n${body}` : '';
+}
+
+// firecrawl：每月 1000 免费额度，搜索 2 credits/10 条结果。v2 端点，结果按 source 分组。
+async function searchFirecrawl(query) {
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (!key) return '';
+  const res = await fetch('https://api.firecrawl.dev/v2/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ query, limit: 5 }),
+    signal: AbortSignal.timeout(12000),
+  });
+  const json = await res.json();
+  const web = json.data?.web || [];
+  return formatResults(web.map((r) => ({ title: r.title, snippet: r.description, url: r.url })));
 }
 
 async function searchTavily(query) {
@@ -35,10 +60,8 @@ async function searchTavily(query) {
     signal: AbortSignal.timeout(10000),
   });
   const json = await res.json();
-  const results = (json.results || [])
-    .map((r, i) => `[${i + 1}] ${r.title}\n${r.content}\n来源：${r.url}`)
-    .join('\n\n');
-  return results ? `以下是联网搜索到的参考信息（可能有噪声，请甄别）：\n\n${results}` : '';
+  const results = json.results || [];
+  return formatResults(results.map((r) => ({ title: r.title, snippet: r.content, url: r.url })));
 }
 
 async function searchBrave(query) {
@@ -52,8 +75,6 @@ async function searchBrave(query) {
     signal: AbortSignal.timeout(10000),
   });
   const json = await res.json();
-  const results = (json.web?.results || [])
-    .map((r, i) => `[${i + 1}] ${r.title}\n${r.description}\n来源：${r.url}`)
-    .join('\n\n');
-  return results ? `以下是联网搜索到的参考信息（可能有噪声，请甄别）：\n\n${results}` : '';
+  const results = json.web?.results || [];
+  return formatResults(results.map((r) => ({ title: r.title, snippet: r.description, url: r.url })));
 }
