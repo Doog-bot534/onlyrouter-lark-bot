@@ -5,12 +5,29 @@ const SPLIT_THRESHOLD = 1500; // 超过此字数才拆分
 const HEADER_TITLE = 'OnlyRouter.Ai 助手';
 const HEADER_COLOR = 'blue'; // 卡片标题栏颜色
 
+// lark_md 不支持标准 markdown 的部分语法（如 # 系标题），
+// 发送前规范化成 lark_md 认得的形式，避免用户看到裸的 ### 之类。
+// 关键：代码块（```...```）内部原样保留，不能动里面的 # 等符号。
+function normalizeMarkdown(md) {
+  const parts = md.split(/(```[\s\S]*?```)/g); // 奇数下标是代码块，原样保留
+  return parts
+    .map((seg, i) => {
+      if (i % 2 === 1) return seg; // 代码块内部不处理
+      return seg
+        // ATX 标题 # ~ ###### → 加粗（行首，可带缩进）。lark_md 不渲染标题。
+        .replace(/^[ \t]*#{1,6}[ \t]+(.+?)[ \t]*#*$/gm, '**$1**')
+        // 分隔线 --- / *** / ___ 单独成行 → 统一成 lark_md 支持的 ---
+        .replace(/^[ \t]*([-*_])\1{2,}[ \t]*$/gm, '---');
+    })
+    .join('');
+}
+
 // 把一段 markdown 文本包装成一张卡片的 content 对象（未 stringify）
 function buildCard(mdText, { title = HEADER_TITLE, showHeader = true, part } = {}) {
   const elements = [
     {
       tag: 'div',
-      text: { tag: 'lark_md', content: mdText },
+      text: { tag: 'lark_md', content: normalizeMarkdown(mdText) },
     },
   ];
   const card = {
