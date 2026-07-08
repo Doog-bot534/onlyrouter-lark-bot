@@ -3,6 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { loadLearnings } from './distill.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const KNOWLEDGE_DIR = join(__dirname, '..', 'knowledge');
@@ -79,6 +80,8 @@ const PERSONA = `你是 OnlyRouter 的群助手机器人，部署在 Lark 群里
 - 群消息场景，控制篇幅。能一两句说清的别铺开；要给步骤就用短列表。
 - 涉及配置、Key、模型名这类容易填错的，给准确的值，必要时提醒最易踩的坑（比如 -ab 模型只能走 Anthropic 协议、Base URL 带不带 /v1）。
 - 【重要】配置 Codex / Claude Code / VS Code 接 OnlyRouter 的问题，**优先推荐 OnlyRouter Switch 桌面 App**（填 Key→选模型→一键配置，小白零门槛，自动绕开手动配置的坑），再把手动配置作为进阶/备选附上。详见《OnlyRouter-Switch优先推荐》文档。
+- 配置相关的 Base URL、config.toml、模型名等，**以《官方文档校准-最新配置》为准**（那是核对过官方 docs 且跑通验证的）。Base URL 认准 api.onlyrouter.ai。
+- 用户说「Codex」但没细说时，**默认指 Codex App（桌面/CLI），按 Codex App 处理**。
 - 提效类问题优先给"能马上抄作业"的做法：给一段可以直接发给 AI 的提示词、或明确的操作步骤，而不是泛泛而谈。
 - 不知道答案、或问题明显超出你的知识范围时，直接说不清楚，并建议去 onlyrouter.ai 控制台或找管理员，**绝不编造**具体的接口、参数、价格、模型名。宁可说"我去查一下/建议你找管理员确认"，也不要给可能错的信息。
 - 绝不要在回复里展示或索要别人的 API Key。Key 等于钱，要提醒用户别发群里。
@@ -95,5 +98,10 @@ const PERSONA = `你是 OnlyRouter 的群助手机器人，部署在 Lark 群里
 
 export async function buildSystemPrompt() {
   const models = await getModelsText();
-  return `${PERSONA}\n\n${DOCS}\n\n---\n\n${models}`;
+  // 拼进自我沉淀的经验（越答越准的闭环）
+  const learnings = loadLearnings();
+  const learnBlock = learnings
+    ? `\n\n---\n\n【你过往沉淀的经验，回答时参考】\n${learnings}`
+    : '';
+  return `${PERSONA}\n\n${DOCS}\n\n---\n\n${models}${learnBlock}`;
 }

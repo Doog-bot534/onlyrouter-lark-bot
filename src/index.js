@@ -13,6 +13,7 @@ import * as Lark from '@larksuiteoapi/node-sdk';
 import { askLLM } from './llm.js';
 import { reportBug, bugReportEnabled } from './bug-report.js';
 import { logQuestion, startDigestSchedule } from './feedback.js';
+import { reflect } from './distill.js';
 
 const { LARK_APP_ID, LARK_APP_SECRET } = process.env;
 
@@ -84,10 +85,13 @@ async function handleQuestion(chatId, chatType, question) {
     const { answer, isBug, bugSummary } = await askLLM(question);
     await sendText(chatId, answer);
 
-    // 记录这条提问，供每日汇总反馈（无论是否 bug 都记）
+    // 记录这条提问，供每周总结反馈（无论是否 bug 都记）
     logQuestion({ question, chatType, chatId, answer, isBug });
 
-    // LLM 判定为产品 bug 时，转发到 OnlyRouter 内部群（如已配 Webhook）
+    // 自我蒸馏：异步反思本次问答，沉淀可复用经验（不 await，不拖慢后续）
+    reflect({ question, answer, isBug });
+
+    // LLM 判定为产品 bug 时，转发到反馈群（如已配 Webhook）
     if (isBug && bugReportEnabled()) {
       await reportBug({ summary: bugSummary || answer.slice(0, 200), question, chatType });
     }
