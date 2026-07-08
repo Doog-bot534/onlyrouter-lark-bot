@@ -211,16 +211,16 @@ Write-Host "✅ 配置完成"
 
 ## 更省心的方式 · OnlyRouter Switch 一键配置
 
-不想碰任何配置文件，可以用我们自研的 **OnlyRouter Switch** 桌面 App：**填 Key → 选模型 → 点一下**，自动写好配置，还附带智能路由（省钱保质）和安全脱敏（防 Key/隐私泄露）。
+不想手写配置文件，可以用 **OnlyRouter Switch** 桌面 App：**填 Key → 选模型 → 点一下**，自动帮你写好本地配置文件。就是个省事的一键配置工具。
 
 > ⚠️ **Switch 目前只一键配置 Codex 和 Claude Code 两种**。VS Code 系（Cline/Roo/Continue）暂不支持，仍需照上面手动填一次。
 
 1. 下载安装 OnlyRouter Switch：https://onlyrouter.ai/download/onlyrouter-switch
 2. 打开 → 粘贴你的 Key → 选默认模型
 3. 点对应按钮一键配置 **Codex** 或 **Claude Code**
-4. App 常驻托盘，换 Key / 换模型免重开终端
+4. 换 Key / 换模型时，在 App 里改一下再点一次一键配置即可。
 
-App 内置本地代理（`127.0.0.1`），所有请求经它中转：自动协议翻译、智能路由比价、出站脱敏。原理详见 OnlyRouter Switch 项目 README。
+Switch 做的事很简单：把你的 Key 和模型写进本地配置文件（`~/.codex/config.toml`、`~/.claude/settings.json`），省得手写。
 
 ---
 
