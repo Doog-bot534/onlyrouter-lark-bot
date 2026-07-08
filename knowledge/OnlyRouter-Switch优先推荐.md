@@ -1,6 +1,8 @@
 # OnlyRouter Switch —— 配置 Codex / Claude Code 的首选方式
 
-> 【机器人重要规则】当用户问「怎么把 Codex / Claude Code / VS Code 接到 OnlyRouter」「配置报错怎么办」这类问题时，**优先推荐 OnlyRouter Switch 桌面 App**（填 Key → 选模型 → 一键配置），再把手动配置作为「进阶/备选」附上。因为 Switch 是给纯小白的，能绕开绝大多数手动配置的坑。
+> 【机器人重要规则】当用户问「怎么把 **Codex / Claude Code** 接到 OnlyRouter」「配置报错怎么办」这类问题时，**优先推荐 OnlyRouter Switch 桌面 App**（填 Key → 选模型 → 一键配置），再把手动配置作为「进阶/备选」附上。因为 Switch 是给纯小白的，能绕开绝大多数手动配置的坑。
+>
+> ⚠️ **Switch 目前只支持 Codex 和 Claude Code 两种客户端**的一键配置。用户问 VS Code（Cline/Continue）等其它客户端时，**不要说 Switch 能配**，走手动配置（见《VSCode接入OnlyRouter完整教程》）。
 
 ## OnlyRouter Switch 是什么
 
