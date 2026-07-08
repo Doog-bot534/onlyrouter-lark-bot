@@ -12,9 +12,25 @@ export function searchEnabled() {
   return PROVIDER !== 'none';
 }
 
-// 返回一段可拼进 LLM 上下文的搜索结果文本；未启用时返回空串。
+// 启发式判断这个问题「值不值得联网」。绝大多数 OnlyRouter 配置/使用/提效问题
+// 靠本地文档就能答，不该无条件联网（每次联网最长阻塞数秒，是主要延迟来源）。
+// 只有出现「需要外部/最新信息」的信号时才搜。零成本，不额外调 LLM。
+const SEARCH_SIGNALS = [
+  '最新', '最近', '今天', '现在', '目前', '20', // 年份/时效
+  '为什么', '报错', '错误', 'error', 'failed', '失败', '不行', '不能用', '连不上', // 疑难排查
+  '对比', '区别', '哪个好', '还是', '相比', // 比较
+  '其他工具', '别的', '除了', '业界', '市面', 'competitor', '竞品',
+];
+function worthSearching(query) {
+  const q = (query || '').toLowerCase();
+  return SEARCH_SIGNALS.some((s) => q.includes(s.toLowerCase()));
+}
+
+// 返回一段可拼进 LLM 上下文的搜索结果文本；未启用或判断不需要时返回空串。
 export async function maybeSearch(query) {
   if (PROVIDER === 'none') return '';
+  // 启发式挡掉大多数「文档就能答」的问题，避免无谓的联网阻塞
+  if (!worthSearching(query)) return '';
 
   try {
     if (PROVIDER === 'firecrawl') return await searchFirecrawl(query);
@@ -50,7 +66,7 @@ async function searchFirecrawl(query) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({ query, limit: 5 }),
-    signal: AbortSignal.timeout(12000),
+    signal: AbortSignal.timeout(6000),
   });
   const json = await res.json();
   const web = json.data?.web || [];

@@ -113,12 +113,21 @@ const PERSONA = `你是 OnlyRouter 的群助手机器人，部署在 Lark 群里
 
 下面是你掌握的全部知识（产品文档 + 实时模型列表），据此回答：`;
 
+// system prompt 缓存：DOCS 是常量，models 有 10 分钟缓存，learnings 变化不频繁。
+// 缓存拼好的整串，只在 models 刷新或 learnings 变化时重拼，省掉每条消息的文件读+3万字拼接。
+let promptCache = { text: '', modelsAt: 0, learnLen: -1 };
+
 export async function buildSystemPrompt() {
   const models = await getModelsText();
-  // 拼进自我沉淀的经验（越答越准的闭环）
   const learnings = loadLearnings();
+  // models 时间戳没变 + learnings 长度没变 → 直接返回缓存
+  if (promptCache.text && promptCache.modelsAt === modelsCache.at && promptCache.learnLen === learnings.length) {
+    return promptCache.text;
+  }
   const learnBlock = learnings
     ? `\n\n---\n\n【你过往沉淀的经验，回答时参考】\n${learnings}`
     : '';
-  return `${PERSONA}\n\n${DOCS}\n\n---\n\n${models}${learnBlock}`;
+  const text = `${PERSONA}\n\n${DOCS}\n\n---\n\n${models}${learnBlock}`;
+  promptCache = { text, modelsAt: modelsCache.at, learnLen: learnings.length };
+  return text;
 }
