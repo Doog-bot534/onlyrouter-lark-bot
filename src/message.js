@@ -2,7 +2,7 @@
 // - 卡片用 lark_md，支持加粗、代码块、分割线、列表、链接（纯文本不渲染 markdown，故弃用）。
 // - 超长回答（>SPLIT_THRESHOLD 字）按段落拆成多条卡片发，避免一大坨刷屏。
 const SPLIT_THRESHOLD = 1500; // 超过此字数才拆分
-const HEADER_TITLE = 'OnlyRouter 助手';
+const HEADER_TITLE = 'OnlyRouter.Ai 助手';
 const HEADER_COLOR = 'blue'; // 卡片标题栏颜色
 
 // 把一段 markdown 文本包装成一张卡片的 content 对象（未 stringify）
