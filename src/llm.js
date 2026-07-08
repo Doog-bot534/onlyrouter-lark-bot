@@ -46,7 +46,7 @@ async function callAnthropic(system, question) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2000,
+      max_tokens: 3000,
       temperature: 0.3,
       system,
       messages: [{ role: 'user', content: question }],
@@ -77,7 +77,7 @@ async function callOpenAI(system, question) {
         { role: 'user', content: question },
       ],
       temperature: 0.3,
-      max_tokens: 2000,
+      max_tokens: 3000,
     }),
     signal: AbortSignal.timeout(120000),
   });
@@ -91,12 +91,21 @@ async function callOpenAI(system, question) {
   return text;
 }
 
-// LLM 被要求输出结构化 JSON（回答 + bug 判定）。容错解析：
-// 万一它没按格式来（裹了代码块、或纯文本），就降级成「纯回答、非 bug」。
+// LLM 被要求输出结构化 JSON（回答 + bug 判定）。多级容错解析，保证用户永远看到干净答案：
+//   1) 标准 JSON.parse
+//   2) 抠出 answer 字段（应对被 max_tokens 截断、JSON 没闭合的情况）
+//   3) 实在不是 JSON，原样返回（纯文本回复也 OK）
 function parseResult(raw) {
   let s = raw.trim();
-  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) s = fence[1].trim();
+  // 仅当整段被代码块包裹时才剥外壳（如模型把 JSON 放进 ```json ```）。
+  // 注意：不能用宽松正则匹配中间任意代码块——answer 内容里常含 ```bash``` 等示例代码块，
+  // 那会把示例代码误当成 JSON 外壳抠出来，导致解析失败、把 JSON 壳暴露给用户。
+  if (s.startsWith('```')) {
+    const fence = s.match(/^```(?:json)?\s*([\s\S]*?)```$/);
+    if (fence) s = fence[1].trim();
+  }
+
+  // 1) 标准解析
   try {
     const obj = JSON.parse(s);
     if (typeof obj.answer === 'string' && obj.answer.trim()) {
@@ -107,7 +116,42 @@ function parseResult(raw) {
       };
     }
   } catch {
-    // 不是合法 JSON，降级处理
+    // 落到下面的字段抠取
   }
+
+  // 2) 是 JSON 壳但解析失败（多半被截断）：手动抠 answer 字段的字符串值
+  if (s.startsWith('{') && /"answer"\s*:/.test(s)) {
+    const answer = extractJsonString(s, 'answer');
+    if (answer) {
+      const isBug = /"is_bug"\s*:\s*true/.test(s);
+      const bugSummary = extractJsonString(s, 'bug_summary') || '';
+      return { answer, isBug, bugSummary };
+    }
+  }
+
+  // 3) 纯文本，原样返回
   return { answer: raw, isBug: false, bugSummary: '' };
+}
+
+// 从（可能不完整的）JSON 文本里抠出某个字符串字段的值，正确处理转义。
+// 截断时返回到目前为止的内容，避免把 JSON 壳暴露给用户。
+function extractJsonString(text, key) {
+  const m = text.match(new RegExp(`"${key}"\\s*:\\s*"`));
+  if (!m) return '';
+  let i = m.index + m[0].length;
+  let out = '';
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '\\') {
+      const next = text[i + 1];
+      const map = { n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\', '/': '/' };
+      out += map[next] ?? next ?? '';
+      i += 2;
+      continue;
+    }
+    if (c === '"') break; // 字符串正常结束
+    out += c;
+    i++;
+  }
+  return out.trim();
 }
