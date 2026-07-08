@@ -23,11 +23,13 @@ function normalizeMarkdown(md) {
 }
 
 // 把一段 markdown 文本包装成一张卡片的 content 对象（未 stringify）
+// 用独立的 markdown 组件（tag:'markdown'）而非 text 里的 lark_md：
+//   代码块 ``` 和有序/无序列表「仅 markdown 组件支持」，lark_md 不渲染（需 Lark 7.6+）。
 function buildCard(mdText, { title = HEADER_TITLE, showHeader = true, part } = {}) {
   const elements = [
     {
-      tag: 'div',
-      text: { tag: 'lark_md', content: normalizeMarkdown(mdText) },
+      tag: 'markdown',
+      content: normalizeMarkdown(mdText),
     },
   ];
   const card = {

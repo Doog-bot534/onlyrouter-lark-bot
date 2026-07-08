@@ -4,11 +4,11 @@ services:
     container_name: onlyrouter-lark-bot
     restart: always
     env_file: .env
-    # 阿里云 ECS 内网 DNS(100.100.x)对容器 DNS 转发不稳，导致容器内解析
-    # open.larksuite.com 失败(EAI_AGAIN)。直接给容器指定公共 DNS 解决。
-    dns:
-      - 223.5.5.5
-      - 223.6.6.6
+    # 阿里云 ECS 上 Docker 默认 bridge 网络存在 DNS/连通问题：容器内解析
+    # open.larksuite.com 失败(EAI_AGAIN)或解析出 IP 也连不通。实测宿主机
+    # 和 host 网络都正常，故用 host 网络绕过。bot 只对外发请求、不监听端口，
+    # 用 host 网络无副作用。
+    network_mode: host
     volumes:
       - ./data:/app/data
       # 挂载知识库目录，改文档后重启容器即可生效，无需重建镜像
