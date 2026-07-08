@@ -14,6 +14,7 @@ import { askLLM } from './llm.js';
 import { reportBug, bugReportEnabled } from './bug-report.js';
 import { logQuestion, startDigestSchedule } from './feedback.js';
 import { reflect } from './distill.js';
+import { buildCards, buildSimpleCard } from './message.js';
 
 const { LARK_APP_ID, LARK_APP_SECRET } = process.env;
 
@@ -67,23 +68,36 @@ function extractQuestion(content, mentions) {
   return text.trim();
 }
 
-// ---- 发消息到群（纯文本）----
-async function sendText(chatId, text) {
+// ---- 发一张卡片 ----
+async function sendCard(chatId, cardContent) {
   await client.im.v1.message.create({
     params: { receive_id_type: 'chat_id' },
     data: {
       receive_id: chatId,
-      msg_type: 'text',
-      content: JSON.stringify({ text }),
+      msg_type: 'interactive',
+      content: cardContent,
     },
   });
+}
+
+// ---- 发简短提示（错误、招呼等），走卡片保持风格统一 ----
+async function sendText(chatId, text) {
+  await sendCard(chatId, buildSimpleCard(text));
+}
+
+// ---- 发正式回答：markdown 渲染成卡片，超长自动拆成多条按序发 ----
+async function sendAnswer(chatId, answer) {
+  const cards = buildCards(answer);
+  for (const c of cards) {
+    await sendCard(chatId, c);
+  }
 }
 
 // ---- 后台异步处理一条提问：生成回复并发回群 ----
 async function handleQuestion(chatId, chatType, question) {
   try {
     const { answer, isBug, bugSummary } = await askLLM(question);
-    await sendText(chatId, answer);
+    await sendAnswer(chatId, answer);
 
     // 记录这条提问，供每周总结反馈（无论是否 bug 都记）
     logQuestion({ question, chatType, chatId, answer, isBug });
