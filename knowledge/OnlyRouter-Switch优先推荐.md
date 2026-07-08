@@ -17,7 +17,7 @@
 
 ## 怎么让用户用上 Switch
 
-1. 找管理员要 **OnlyRouter Switch 安装包**（内部分发）。
+1. 下载 **OnlyRouter Switch**：https://onlyrouter.ai/download/onlyrouter-switch （Windows / macOS）。
 2. 打开 App → 粘贴自己的 OnlyRouter Key（`sk-` 开头，onlyrouter.ai 控制台创建）→ 选默认模型。
 3. 点对应按钮一键配置 **Codex** 或 **Claude Code**。
 4. App 常驻托盘，换 Key / 换模型免重开终端。

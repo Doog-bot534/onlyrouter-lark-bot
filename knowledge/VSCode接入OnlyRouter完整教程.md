@@ -215,7 +215,7 @@ Write-Host "✅ 配置完成"
 
 > 路线 B（Cline/Roo）因为没有配置文件、只能 UI 手填，App 无法自动写入，仍需照 B-2 手动填一次。
 
-1. 下载安装 OnlyRouter Switch（向管理员索取安装包）
+1. 下载安装 OnlyRouter Switch：https://onlyrouter.ai/download/onlyrouter-switch
 2. 打开 → 粘贴你的 Key → 选默认模型
 3. 点对应按钮一键配置 **Claude Code** 或 **VS Code（Continue）**
 4. App 常驻托盘，换 Key / 换模型免重开终端
