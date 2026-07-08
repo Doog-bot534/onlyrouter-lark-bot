@@ -1,5 +1,5 @@
-// 信息反馈：记录每条用户提问，每天定时用 LLM 汇总当天提问，发到产品反馈群，帮助产品迭代。
-// 与 bug 上报分开：bug 是即时推到开发群，这里是每日聚合推到产品反馈群。
+// 信息反馈：记录每条用户提问，每周定时用 LLM 汇总最近一周提问，发到反馈群，帮助产品迭代。
+// 与 bug 上报分开：bug 是即时推群，这里是每周聚合推群（本项目里两者可以是同一个群）。
 import { appendFileSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -12,9 +12,10 @@ const LOG_FILE = join(DATA_DIR, 'questions.jsonl');
 const STATE_FILE = join(DATA_DIR, 'digest-state.json');
 mkdirSync(DATA_DIR, { recursive: true });
 
-const WEBHOOK_URL = process.env.LARK_FEEDBACK_WEBHOOK_URL;
-// 每天几点汇总，默认 18:00（cron: 分 时 * * *）
-const DIGEST_CRON = process.env.FEEDBACK_DIGEST_CRON || '3 18 * * *';
+// 周报群：优先用专用 Webhook，没配就回退到统一的 LARK_REPORT_WEBHOOK_URL（bug 和周报同群时只填这一个）
+const WEBHOOK_URL = process.env.LARK_FEEDBACK_WEBHOOK_URL || process.env.LARK_REPORT_WEBHOOK_URL;
+// 每周何时总结，默认每周一 10:07（cron: 分 时 * * 周几；1=周一）
+const DIGEST_CRON = process.env.FEEDBACK_DIGEST_CRON || '7 10 * * 1';
 
 // ---- 记录一条提问（每条消息都记，无论是否 bug）----
 export function logQuestion({ question, chatType, chatId, answer, isBug }) {
@@ -33,15 +34,16 @@ export function logQuestion({ question, chatType, chatId, answer, isBug }) {
   }
 }
 
-// ---- 读取某天的提问 ----
-function readQuestionsOfDay(dayStr) {
+// ---- 读取最近 N 天的提问（默认 7 天，用于每周总结）----
+function readRecentQuestions(days = 7) {
   if (!existsSync(LOG_FILE)) return [];
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   const lines = readFileSync(LOG_FILE, 'utf8').split('\n').filter(Boolean);
   const out = [];
   for (const l of lines) {
     try {
       const o = JSON.parse(l);
-      if (o.ts.slice(0, 10) === dayStr) out.push(o);
+      if (new Date(o.ts).getTime() >= cutoff) out.push(o);
     } catch {
       // 跳过坏行
     }
@@ -49,28 +51,28 @@ function readQuestionsOfDay(dayStr) {
   return out;
 }
 
-// 防重复：记住已汇总过的日期
-function alreadyDigested(dayStr) {
+// 防重复：记住本周期已汇总过的标记（用当次运行日期做键，避免同一天重复触发）
+function alreadyDigested(tag) {
   try {
     if (!existsSync(STATE_FILE)) return false;
     const s = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
-    return s.lastDigestDay === dayStr;
+    return s.lastDigestTag === tag;
   } catch {
     return false;
   }
 }
-function markDigested(dayStr) {
+function markDigested(tag) {
   try {
-    writeFileSync(STATE_FILE, JSON.stringify({ lastDigestDay: dayStr }), 'utf8');
+    writeFileSync(STATE_FILE, JSON.stringify({ lastDigestTag: tag }), 'utf8');
   } catch (e) {
     console.error('[feedback] 写汇总状态失败:', e.message);
   }
 }
-// ---- 生成并发送当天汇总 ----
-async function runDigest(dayStr) {
-  const items = readQuestionsOfDay(dayStr);
+// ---- 生成并发送每周总结 ----
+async function runDigest(rangeLabel) {
+  const items = readRecentQuestions(7);
   if (items.length === 0) {
-    console.log(`[feedback] ${dayStr} 无提问，跳过汇总`);
+    console.log(`[feedback] 最近 7 天无提问，跳过每周总结`);
     return;
   }
 
@@ -78,12 +80,12 @@ async function runDigest(dayStr) {
     .map((o, i) => `${i + 1}. ${o.question}${o.isBug ? '（机器人判定为疑似bug）' : ''}`)
     .join('\n');
 
-  const system = `你是产品分析助手。下面是 OnlyRouter Lark 群机器人今天收到的用户提问原始列表。请汇总成一份简短的产品反馈日报，用于团队做产品迭代。要求：
+  const system = `你是产品分析助手。下面是 OnlyRouter Lark 群机器人最近一周收到的用户提问原始列表。请汇总成一份简短的产品反馈周报，用于团队做产品迭代。要求：
 1. 归纳「高频问题/主题」——哪些问题被反复问，说明文档或产品可能需要改进。
 2. 列出「用户遇到的难点/卡点」。
 3. 给出「产品改进建议」1-3 条（如某配置总被问说明流程复杂、某能力常被需要说明可强化）。
-4. 简洁，用条目，别超过 400 字。不要逐条复述所有问题。`;
-  const user = `日期：${dayStr}，共 ${items.length} 条提问：\n\n${qList}`;
+4. 简洁，用条目，别超过 500 字。不要逐条复述所有问题。`;
+  const user = `统计区间：${rangeLabel}，共 ${items.length} 条提问：\n\n${qList}`;
 
   let summary;
   try {
@@ -95,14 +97,14 @@ async function runDigest(dayStr) {
 
   const bugCount = items.filter((o) => o.isBug).length;
   const text = [
-    `📊 OnlyRouter 群助手 · 每日反馈（${dayStr}）`,
-    `提问总数：${items.length} 条${bugCount ? `，其中疑似 bug ${bugCount} 条` : ''}`,
+    `📊 OnlyRouter 群助手 · 每周总结（${rangeLabel}）`,
+    `本周提问：${items.length} 条${bugCount ? `，其中疑似 bug ${bugCount} 条` : ''}`,
     '',
     summary,
   ].join('\n');
 
   await sendToFeedbackGroup(text);
-  markDigested(dayStr);
+  markDigested(rangeLabel);
 }
 
 async function sendToFeedbackGroup(text) {
@@ -118,16 +120,19 @@ async function sendToFeedbackGroup(text) {
       signal: AbortSignal.timeout(8000),
     });
     const json = await res.json().catch(() => ({}));
-    if (json.code && json.code !== 0) console.error('[feedback] 汇总发送失败:', JSON.stringify(json));
-    else console.log('[feedback] 每日汇总已发送到产品反馈群');
+    if (json.code && json.code !== 0) console.error('[feedback] 周报发送失败:', JSON.stringify(json));
+    else console.log('[feedback] 每周总结已发送到反馈群');
   } catch (e) {
-    console.error('[feedback] 汇总发送异常:', e.message);
+    console.error('[feedback] 周报发送异常:', e.message);
   }
 }
 
-// 昨天的日期字符串（汇总在次日凌晨或当天晚上跑，这里汇总「当天」）
-function todayStr() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }); // YYYY-MM-DD
+// 本周区间标签，如 "2026-07-01 ~ 2026-07-08"
+function weekRangeLabel() {
+  const fmt = (d) => d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
+  const now = new Date();
+  const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return `${fmt(from)} ~ ${fmt(now)}`;
 }
 
 // ---- 启动定时任务 ----
@@ -135,20 +140,20 @@ export function startDigestSchedule() {
   cron.schedule(
     DIGEST_CRON,
     () => {
-      const day = todayStr();
-      if (alreadyDigested(day)) {
-        console.log(`[feedback] ${day} 已汇总过，跳过`);
+      const label = weekRangeLabel();
+      if (alreadyDigested(label)) {
+        console.log(`[feedback] ${label} 已总结过，跳过`);
         return;
       }
-      console.log(`[feedback] 触发每日汇总：${day}`);
-      runDigest(day);
+      console.log(`[feedback] 触发每周总结：${label}`);
+      runDigest(label);
     },
     { timezone: 'Asia/Shanghai' }
   );
-  console.log(`[feedback] 每日汇总已排程（cron: ${DIGEST_CRON}，时区 Asia/Shanghai）${WEBHOOK_URL ? '' : '，⚠️ 未配置反馈 Webhook，将只打印到日志'}`);
+  console.log(`[feedback] 每周总结已排程（cron: ${DIGEST_CRON}，时区 Asia/Shanghai）${WEBHOOK_URL ? '' : '，⚠️ 未配置反馈 Webhook，将只打印到日志'}`);
 }
 
-// 供手动测试：立即汇总指定日期（默认今天）
-export async function runDigestNow(day) {
-  return runDigest(day || todayStr());
+// 供手动测试：立即生成本周总结
+export async function runDigestNow() {
+  return runDigest(weekRangeLabel());
 }

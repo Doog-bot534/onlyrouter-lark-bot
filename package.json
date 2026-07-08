@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "digest": "node -e \"import('./src/feedback.js').then(m=>m.runDigestNow(process.argv[1]))\""
+    "digest": "node --env-file=.env -e \"import('./src/feedback.js').then(m=>m.runDigestNow())\""
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.68.0",
