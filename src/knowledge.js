@@ -48,7 +48,10 @@ async function getModelsText() {
       (byType[t] ||= []).push(m);
     }
     const typeNames = { text: '对话/文本', image: '图片生成', video: '视频生成', audio: '语音(TTS/识别)' };
+    // 综合价（输入+输出），文本模型按此从低到高排序，便宜的排前面，引导优先推荐性价比高的
+    const combinedPrice = (m) => (parseFloat(m.input_price) || 0) + (parseFloat(m.output_price) || 0);
     const sections = Object.entries(byType).map(([type, ms]) => {
+      if (type === 'text') ms.sort((a, b) => combinedPrice(a) - combinedPrice(b));
       const rows = ms
         .map((m) => {
           if (type === 'text') {
@@ -57,7 +60,8 @@ async function getModelsText() {
           return `- \`${m.name}\`（${m.display_name}）`;
         })
         .join('\n');
-      return `## ${typeNames[type] || type}模型（共 ${ms.length} 个）\n${rows}`;
+      const note = type === 'text' ? '（已按价格从低到高排序，越靠前越便宜）' : '';
+      return `## ${typeNames[type] || type}模型（共 ${ms.length} 个）${note}\n${rows}`;
     });
     const text = `截至此刻 OnlyRouter 平台在线模型（共 ${list.length} 个，数据实时拉取自 onlyrouter.ai/api/models）：\n\n${sections.join('\n\n')}`;
     modelsCache = { text, at: now };
@@ -85,6 +89,7 @@ const PERSONA = `你是 OnlyRouter 的群助手机器人，部署在 Lark 群里
   · 步骤用有序列表 1. 2. 3.，并列项用 - 无序列表；
   · 适当用空行分段，别挤成一坨。
 - 涉及配置、Key、模型名这类容易填错的，给准确的值，必要时提醒最易踩的坑（比如 -ab 模型只能走 Anthropic 协议、Base URL 带不带 /v1）。
+- 【模型推荐】默认**优先推荐低价/高性价比的模型**（下方模型列表已按价格从低到高排序，越靠前越便宜）。日常问答、写东西、简单任务先推便宜的（如 gpt-5.4-mini、deepseek-v4-flash、kimi-k2.6 这类）；只有当用户明确要"最强/最好"、或任务确实复杂（复杂推理、长文、疑难编码）时，才推旗舰模型（如 claude-opus-4-8、gpt-5.5），并顺带提醒它更贵。给推荐时可以简单说下为什么这个够用/更省。
 - 【重要】配置 Codex / Claude Code / VS Code 接 OnlyRouter 的问题，**优先推荐 OnlyRouter Switch 桌面 App**（填 Key→选模型→一键配置，小白零门槛，自动绕开手动配置的坑），再把手动配置作为进阶/备选附上。详见《OnlyRouter-Switch优先推荐》文档。
 - 配置相关的 Base URL、config.toml、模型名等，**以《官方文档校准-最新配置》为准**（那是核对过官方 docs 且跑通验证的）。Base URL 认准 api.onlyrouter.ai。
 - 用户说「Codex」但没细说时，**默认指 Codex App（桌面/CLI），按 Codex App 处理**。
