@@ -13,16 +13,18 @@ const ROOT = (process.env.ONLYROUTER_BASE_URL || 'https://api.onlyrouter.ai')
 
 const isAnthropic = MODEL.endsWith('-ab');
 
-export async function askLLM(question) {
+// images: 可选的图片数组 [{ media_type, data(base64) }]，用于「看图回答」。
+// 目前仅 Anthropic 协议(-ab 模型，已验证 gpt-5.5-ab 支持视觉)带图；OpenAI 协议忽略图片。
+export async function askLLM(question, images = []) {
   if (!API_KEY) {
     throw new Error('未配置 ONLYROUTER_API_KEY，请在 .env 里填上 OnlyRouter 的 Key');
   }
   const system = await buildSystemPrompt();
-  // 联网搜索（默认关闭，返回空串；启用后把搜索结果拼进用户问题）
-  const searchCtx = await maybeSearch(question);
+  // 带图时不做联网搜索（图片问题一般是看图排查，搜索无益还拖慢）
+  const searchCtx = images.length ? '' : await maybeSearch(question);
   const userMsg = searchCtx ? `${searchCtx}\n\n---\n\n用户问题：${question}` : question;
   const raw = isAnthropic
-    ? await callAnthropic(system, userMsg)
+    ? await callAnthropic(system, userMsg, images)
     : await callOpenAI(system, userMsg);
   return parseResult(raw);
 }
@@ -34,7 +36,17 @@ export async function chat(system, user) {
 }
 
 // Anthropic Messages 协议（-ab 模型走这条）
-async function callAnthropic(system, question) {
+async function callAnthropic(system, question, images = []) {
+  // 有图片时用多模态 content（图在前、文字在后）；无图则纯文本
+  const userContent = images.length
+    ? [
+        ...images.map((img) => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.media_type || 'image/png', data: img.data },
+        })),
+        { type: 'text', text: question },
+      ]
+    : question;
   const res = await fetch(`${ROOT}/v1/messages`, {
     method: 'POST',
     headers: {
@@ -49,7 +61,7 @@ async function callAnthropic(system, question) {
       max_tokens: 3000,
       temperature: 0.3,
       system,
-      messages: [{ role: 'user', content: question }],
+      messages: [{ role: 'user', content: userContent }],
     }),
     signal: AbortSignal.timeout(120000),
   });

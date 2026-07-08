@@ -68,6 +68,79 @@ function extractQuestion(content, mentions) {
   return text.trim();
 }
 
+// ---- 从消息内容解析出图片的 image_key 列表 ----
+// image 类型：{ image_key }；post 图文混排：content 里嵌 img 标签 { tag:'img', image_key }
+function extractImageKeys(messageType, content) {
+  const keys = [];
+  try {
+    const obj = JSON.parse(content);
+    if (messageType === 'image' && obj.image_key) {
+      keys.push(obj.image_key);
+    } else if (messageType === 'post') {
+      // post 的 content 是二维数组：[[{tag,...}, ...], ...]
+      const walk = (node) => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (node && node.tag === 'img' && node.image_key) keys.push(node.image_key);
+      };
+      walk(obj.content);
+    }
+  } catch {
+    // 解析失败返回空
+  }
+  return keys;
+}
+
+// ---- 从 post 图文消息里提取纯文字 ----
+function extractPostText(content) {
+  try {
+    const obj = JSON.parse(content);
+    const parts = [];
+    const walk = (node) => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (node && node.tag === 'text' && node.text) parts.push(node.text);
+    };
+    walk(obj.content);
+    return parts.join(' ').trim();
+  } catch {
+    return '';
+  }
+}
+
+// ---- 下载消息里的图片，转成 base64（供视觉模型读图）----
+async function downloadImages(messageId, imageKeys) {
+  const images = [];
+  for (const key of imageKeys.slice(0, 3)) { // 最多取 3 张，控制体积
+    try {
+      const resp = await client.im.v1.messageResource.get({
+        path: { message_id: messageId, file_key: key },
+        params: { type: 'image' },
+      });
+      // SDK 返回可写流/Buffer，统一转 base64
+      const buf = await resourceToBuffer(resp);
+      if (buf && buf.length) {
+        images.push({ media_type: 'image/png', data: buf.toString('base64') });
+      }
+    } catch (e) {
+      console.error('[image] 下载失败:', e.message);
+    }
+  }
+  return images;
+}
+
+// SDK messageResource.get 的返回体转 Buffer（兼容 stream / getReadableStream / Buffer）
+async function resourceToBuffer(resp) {
+  if (!resp) return null;
+  if (Buffer.isBuffer(resp)) return resp;
+  // 新版 SDK 返回带 getReadableStream() 的对象
+  const stream = typeof resp.getReadableStream === 'function' ? resp.getReadableStream() : resp;
+  if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+    const chunks = [];
+    for await (const c of stream) chunks.push(c);
+    return Buffer.concat(chunks);
+  }
+  return null;
+}
+
 // ---- 发一张卡片 ----
 async function sendCard(chatId, cardContent) {
   await client.im.v1.message.create({
@@ -94,16 +167,23 @@ async function sendAnswer(chatId, answer) {
 }
 
 // ---- 后台异步处理一条提问：生成回复并发回群 ----
-async function handleQuestion(chatId, chatType, question) {
+async function handleQuestion(chatId, chatType, question, messageId, imageKeys = []) {
   try {
-    const { answer, isBug, bugSummary } = await askLLM(question);
+    // 有图片则先下载转 base64，让视觉模型看图回答
+    let images = [];
+    if (imageKeys.length) {
+      images = await downloadImages(messageId, imageKeys);
+    }
+    // 只发了图没配文字时，给个默认引导，让模型描述/分析图片
+    const q = question || (images.length ? '看看这张图，帮我分析下（如果是报错截图，说明原因和解决办法）。' : '');
+    const { answer, isBug, bugSummary } = await askLLM(q, images);
     await sendAnswer(chatId, answer);
 
     // 记录这条提问，供每周总结反馈（无论是否 bug 都记）
-    logQuestion({ question, chatType, chatId, answer, isBug });
+    logQuestion({ question: q + (images.length ? ` [含${images.length}图]` : ''), chatType, chatId, answer, isBug });
 
     // 自我蒸馏：异步反思本次问答，沉淀可复用经验（不 await，不拖慢后续）
-    reflect({ question, answer, isBug });
+    reflect({ question: q, answer, isBug });
 
     // LLM 判定为产品 bug 时，转发到反馈群（如已配 Webhook）
     if (isBug && bugReportEnabled()) {
@@ -129,25 +209,37 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
     // 去重：超时重推的同一条消息直接跳过
     if (alreadyHandled(message_id)) return;
 
-    // 只处理文本消息
-    if (message_type !== 'text') return;
-
-    // 群聊里必须 @ 机器人才回答；单聊（p2p）直接回答
+    // 先判是否该响应：群聊必须 @ 机器人；单聊（p2p）都响应。
+    // （放在类型判断之前，这样收到看不了的类型也能在该响应时给提示，而不打扰未 @ 的群消息）
     if (chat_type === 'group') {
       const mentioned = Array.isArray(mentions) && mentions.length > 0;
       if (!mentioned) return;
     }
 
-    const question = extractQuestion(content, mentions);
-    if (!question) {
-      // 只 @ 了机器人没说话
+    // 只处理文本、图片、图文混排；其它类型（视频/文件/语音等）给友好提示，不装死
+    if (!['text', 'image', 'post'].includes(message_type)) {
+      sendText(chat_id, '我目前只能看文字和图片，还看不了视频/文件/语音这类内容 🙇 麻烦把问题用文字描述，或者截个图发我～').catch(() => {});
+      return;
+    }
+
+    // 取文字：text 从 content.text，post 从富文本里的 text 节点
+    let question = message_type === 'post' ? extractPostText(content) : extractQuestion(content, mentions);
+    if (Array.isArray(mentions)) {
+      for (const m of mentions) if (m.key) question = question.replaceAll(m.key, '').trim();
+    }
+
+    // 取图片 key
+    const imageKeys = extractImageKeys(message_type, content);
+
+    // 纯 @ 没内容也没图
+    if (!question && imageKeys.length === 0) {
       sendText(chat_id, '在的，关于 OnlyRouter 有什么想问的？比如怎么拿 Key、怎么配 VS Code、有哪些模型、报错怎么办。').catch(() => {});
       return;
     }
 
-    console.log(`[msg] ${chat_type} 提问: ${question.slice(0, 80)}`);
+    console.log(`[msg] ${chat_type} ${message_type} 提问: ${question.slice(0, 60)}${imageKeys.length ? ` [含${imageKeys.length}图]` : ''}`);
     // 关键：不 await，立即返回让 handler 在 3 秒内结束，避免 Lark 超时重推
-    handleQuestion(chat_id, chat_type, question);
+    handleQuestion(chat_id, chat_type, question, message_id, imageKeys);
   },
 });
 
