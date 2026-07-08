@@ -1,0 +1,10 @@
+{
+  "scopes": {
+    "tenant": [
+      "im:message",
+      "im:message:send_as_bot",
+      "im:resource"
+    ],
+    "user": []
+  }
+}
