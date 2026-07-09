@@ -27,7 +27,7 @@ function readBody(req) {
     let data = '';
     req.on('data', (c) => {
       data += c;
-      if (data.length > 1_000_000) reject(new Error('body too large')); // 1MB 上限
+      if (data.length > 30_000_000) reject(new Error('body too large')); // 30MB 上限（含图片 base64）
     });
     req.on('end', () => resolve(data));
     req.on('error', reject);
@@ -58,9 +58,9 @@ async function handleChat(req, res) {
     const body = JSON.parse(await readBody(req));
     messages = body.messages;
     if (!Array.isArray(messages) || messages.length === 0) throw new Error('empty');
-    // 只保留 role+content，防注入多余字段；限制历史长度控制 token
+    // 只保留 role+content，防注入多余字段；content 可为字符串或多模态数组（图+文）
     messages = messages
-      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && (typeof m.content === 'string' || Array.isArray(m.content)))
       .slice(-12);
     if (!messages.length) throw new Error('invalid');
   } catch {

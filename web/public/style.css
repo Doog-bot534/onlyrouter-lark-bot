@@ -315,6 +315,23 @@ body {
 .faq b { color: var(--text); }
 .deploy-foot { margin-top: 28px; font-size: 12px; color: var(--text-faint); line-height: 1.6; }
 
+/* ===== 图片上传（聊天输入区）===== */
+.attach-btn {
+  flex-shrink: 0; width: 38px; height: 38px; border: none; border-radius: 10px;
+  background: var(--surface-2); color: var(--text-dim); cursor: pointer;
+  display: grid; place-items: center; transition: all 0.18s; align-self: flex-end;
+}
+.attach-btn:hover { color: var(--lime); background: var(--surface); }
+.img-preview { display: flex; gap: 8px; flex-wrap: wrap; max-width: 760px; margin: 0 auto 8px; }
+.img-preview .thumb { position: relative; width: 60px; height: 60px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.img-preview .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.img-preview .thumb button {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border: none; border-radius: 50%;
+  background: rgba(0,0,0,.7); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+}
+/* 用户气泡里的图 */
+.msg-body .sent-img { max-width: 200px; border-radius: 8px; margin-bottom: 6px; display: block; }
+
 /* ===== 聊天欢迎屏 · 细化引导 ===== */
 .welcome-sub strong { color: var(--lime); font-weight: 600; }
 .cat-grid {
