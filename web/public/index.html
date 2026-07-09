@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>OnlyRouter 助手</title>
-  <meta name="description" content="OnlyRouter AI 助手 — 解答配置、报错、模型选择与 AI 提效" />
+  <meta name="description" content="OnlyRouter AI 助手 — 解答配置、报错、模型选择与 AI 提效，并可一键接入你自己的 Lark/飞书 Bot" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -16,34 +16,42 @@
       <span class="logo">ONLYROUTER.</span>
       <span class="brand-sub">AI 助手</span>
     </div>
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="chat">问答助手</button>
+      <button class="tab" data-tab="deploy">接入我的 Bot</button>
+    </div>
     <a class="topbar-link" href="https://onlyrouter.ai" target="_blank" rel="noopener">前往官网 ↗</a>
   </header>
 
-  <main class="chat" id="chat">
-    <!-- 欢迎屏 -->
-    <section class="welcome" id="welcome">
-      <div class="welcome-badge">● 在线</div>
-      <h1 class="welcome-title">有什么可以帮你的？</h1>
-      <p class="welcome-sub">OnlyRouter 使用问题、配置报错、模型怎么选、怎么用 AI 提效 —— 都可以问我。</p>
-      <div class="suggestions" id="suggestions">
-        <button class="chip" data-q="Codex 怎么接入 OnlyRouter？">怎么配 Codex</button>
-        <button class="chip" data-q="OnlyRouter 上有哪些模型，哪个最便宜？">有哪些模型</button>
-        <button class="chip" data-q="调用模型报错 401 是什么原因？">报错怎么办</button>
-        <button class="chip" data-q="怎么用 AI 帮我整理会议纪要？">用 AI 提效</button>
+  <div class="layout">
+    <!-- 左：聊天 -->
+    <main class="chat pane" id="chat" data-pane="chat">
+      <section class="welcome" id="welcome">
+        <div class="welcome-badge">● 在线</div>
+        <h1 class="welcome-title">有什么可以帮你的？</h1>
+        <p class="welcome-sub">OnlyRouter 使用问题、配置报错、模型怎么选、怎么用 AI 提效 —— 都可以问我。</p>
+        <div class="suggestions" id="suggestions">
+          <button class="chip" data-q="Codex 怎么接入 OnlyRouter？">怎么配 Codex</button>
+          <button class="chip" data-q="OnlyRouter 上有哪些模型，哪个最便宜？">有哪些模型</button>
+          <button class="chip" data-q="调用模型报错 401 是什么原因？">报错怎么办</button>
+          <button class="chip" data-q="怎么用 AI 帮我整理会议纪要？">用 AI 提效</button>
+        </div>
+      </section>
+      <div class="messages" id="messages"></div>
+      <div class="composer">
+        <div class="composer-inner">
+          <textarea id="input" rows="1" placeholder="问点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
+          <button id="send" class="send-btn" aria-label="发送">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.4 20.4l17.45-7.48a1 1 0 000-1.84L3.4 3.6a.993.993 0 00-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .68.71 1.15 1.39.91z"/></svg>
+          </button>
+        </div>
+        <p class="composer-hint">AI 生成内容仅供参考，重要操作请以 onlyrouter.ai 官方文档为准。</p>
       </div>
-    </section>
-    <div class="messages" id="messages"></div>
-  </main>
+    </main>
 
-  <footer class="composer">
-    <div class="composer-inner">
-      <textarea id="input" rows="1" placeholder="问点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
-      <button id="send" class="send-btn" aria-label="发送">
-        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.4 20.4l17.45-7.48a1 1 0 000-1.84L3.4 3.6a.993.993 0 00-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .68.71 1.15 1.39.91z"/></svg>
-      </button>
-    </div>
-    <p class="composer-hint">AI 生成内容仅供参考，重要操作请以 onlyrouter.ai 官方文档为准。</p>
-  </footer>
+    <!-- 右：接入面板（内容由 deploy.html 片段填充，见下方 section） -->
+    <aside class="deploy pane" id="deploy" data-pane="deploy" hidden></aside>
+  </div>
 
   <script src="/app.js"></script>
 </body>

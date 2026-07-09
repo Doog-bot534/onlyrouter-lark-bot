@@ -7,19 +7,20 @@ export function bugReportEnabled() {
   return Boolean(WEBHOOK_URL);
 }
 
-export async function reportBug({ summary, question, chatType }) {
+export async function reportBug({ summary, question, chatType, tenantId }) {
   if (!WEBHOOK_URL) return;
 
   const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
   const text = [
     '🐞 OnlyRouter 疑似 Bug 上报',
     `时间：${time}`,
+    tenantId ? `来源租户：${tenantId}` : null,
     `来源：Lark ${chatType === 'group' ? '群聊' : '单聊'}`,
     '',
     `用户原话：${question}`,
     '',
     `机器人判断：${summary}`,
-  ].join('\n');
+  ].filter((l) => l !== null).join('\n');
 
   try {
     const res = await fetch(WEBHOOK_URL, {

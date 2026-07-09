@@ -1,0 +1,111 @@
+<div class="deploy-inner">
+  <div class="deploy-head">
+    <h2>把 AI 助手装进你自己的群</h2>
+    <p class="deploy-lead">
+      给你的企业接一个 <strong>飞书 / Lark 答疑机器人</strong>：你的客户在你们群里 @ 它，
+      就能自动获得 OnlyRouter 使用解答。<strong>你不用写代码、不用部署服务器</strong>，填两个信息就行。
+    </p>
+  </div>
+
+  <div class="steps">
+    <div class="steps-title">接入前，先在飞书/Lark 后台建个应用（约 5 分钟）</div>
+
+    <details class="step" open>
+      <summary><span class="step-no">1</span> 创建企业自建应用</summary>
+      <div class="step-body">
+        打开 <a href="https://open.larksuite.com/app" target="_blank" rel="noopener">open.larksuite.com/app</a>
+        （飞书国内版是 <a href="https://open.feishu.cn/app" target="_blank" rel="noopener">open.feishu.cn/app</a>）→
+        点「创建企业自建应用」→ 填个名字和图标。
+      </div>
+    </details>
+
+    <details class="step">
+      <summary><span class="step-no">2</span> 开启「机器人」能力</summary>
+      <div class="step-body">
+        进应用 → 左侧「添加应用能力」→ 找到「机器人」→ 开启。
+      </div>
+    </details>
+
+    <details class="step">
+      <summary><span class="step-no">3</span> 开通 3 个权限</summary>
+      <div class="step-body">
+        左侧「权限管理」，搜索并开通：
+        <ul>
+          <li><b>获取与发送单聊、群组消息</b>（im:message）</li>
+          <li><b>以应用身份发消息</b>（im:message:send_as_bot）</li>
+          <li><b>读取消息中的图片</b>（im:resource，让机器人能看报错截图）</li>
+        </ul>
+        <p class="tip">搜不到英文 code 就按中文名找，认准这三类即可。</p>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary><span class="step-no">4</span> 事件订阅：选「长连接」+ 加接收消息</summary>
+      <div class="step-body">
+        左侧「事件与回调」→ 订阅方式选 <b>使用长连接接收</b>（很重要，别选发到开发者服务器）→
+        添加事件 <b>接收消息 im.message.receive_v1</b>。
+      </div>
+    </details>
+
+    <details class="step step-warn">
+      <summary><span class="step-no">5</span> 创建版本并发布 ⚠️</summary>
+      <div class="step-body">
+        右上角「创建版本」→ 提交发布（企业自建应用一般管理员一键通过）。
+        <p class="tip warn">⚠️ 这一步最容易漏！<b>不发布版本，前面的权限和事件都不生效</b>，机器人会收不到消息。</p>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary><span class="step-no">6</span> 复制 App ID 和 App Secret</summary>
+      <div class="step-body">
+        左侧「凭证与基础信息」→ 复制 <b>App ID</b> 和 <b>App Secret</b> 两串字符，粘到下面表单。
+        <p class="tip">App Secret 只用于托管你的机器人，我们<b>加密存储</b>，不会外泄。</p>
+      </div>
+    </details>
+  </div>
+  <!-- 接入表单 -->
+  <form class="deploy-form" id="deployForm">
+    <div class="form-title">填好上面的信息，一键接入 👇</div>
+    <label>给你的机器人起个名<input type="text" id="f-name" placeholder="如：ACME 客服助手" /></label>
+    <label>App ID<input type="text" id="f-appid" placeholder="cli_xxxxxxxxxxxx" required /></label>
+    <label>App Secret<input type="password" id="f-secret" placeholder="粘贴你的 App Secret" required /></label>
+    <label>版本
+      <select id="f-domain">
+        <option value="lark">Lark 国际版（open.larksuite.com）</option>
+        <option value="feishu">飞书国内版（open.feishu.cn）</option>
+      </select>
+    </label>
+    <button type="submit" class="big-btn" id="f-submit">一键接入</button>
+    <div class="form-result" id="formResult" hidden></div>
+  </form>
+
+  <!-- 管理已接入的 Bot -->
+  <details class="manage">
+    <summary>管理已接入的 Bot（改配置 / 暂停 / 删除）</summary>
+    <div class="manage-body">
+      <p class="tip">用接入成功时给你的「管理令牌」来操作。</p>
+      <label>接入 ID<input type="text" id="m-tid" placeholder="接入成功时给的 ID" /></label>
+      <label>管理令牌<input type="password" id="m-token" placeholder="接入成功时给的令牌" /></label>
+      <div class="manage-btns">
+        <button type="button" class="mini-btn" id="m-query">查询状态</button>
+        <button type="button" class="mini-btn" id="m-pause">暂停</button>
+        <button type="button" class="mini-btn" id="m-resume">恢复</button>
+        <button type="button" class="mini-btn danger" id="m-remove">删除</button>
+      </div>
+      <div class="form-result" id="manageResult" hidden></div>
+    </div>
+  </details>
+
+  <!-- FAQ -->
+  <div class="faq">
+    <div class="faq-title">常见问题</div>
+    <details><summary>接入后，我的客户怎么用？</summary><div>把机器人拉进你们的群（群设置 → 群机器人 → 添加机器人 → 选你的应用），客户在群里 @ 它提问即可。</div></details>
+    <details><summary>群里 @ 了没反应？</summary><div>八成是没「创建版本并发布」（第 5 步），或事件订阅没选长连接。回后台检查并重新发布。</div></details>
+    <details><summary>App Secret 交给你们安全吗？</summary><div>只用于托管你的机器人，我们用 AES 加密存储，日志也不会打印。你随时可以在飞书后台重置 Secret 使旧的失效。</div></details>
+    <details><summary>会产生费用吗？</summary><div>机器人回答用的是 OnlyRouter 的模型额度。托管本身不额外收费。</div></details>
+    <details><summary>bug 反馈是怎么回事？</summary><div>机器人若判断用户遇到的是 OnlyRouter 平台 bug，会静默同步给我们帮助改进产品，<b>不会打扰你的群</b>。</div></details>
+  </div>
+
+  <p class="deploy-foot">接入即表示同意由 OnlyRouter 托管运行你的机器人。凭证加密存储，仅用于此用途。</p>
+
+</div>

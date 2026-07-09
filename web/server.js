@@ -6,6 +6,8 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { askLLMStream } from '../src/llm.js';
+import { loadAll, addTenant, updateTenant, toggleTenant, removeTenant, getTenant } from '../src/tenant-manager.js';
+import { startDigestSchedule } from '../src/feedback.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -90,9 +92,43 @@ async function handleChat(req, res) {
   res.end();
 }
 
+// 租户管理路由：注册/改配置/暂停恢复/删除/查询。统一读 JSON body → 调 tenant-manager。
+async function handleTenant(req, res, action) {
+  let body = {};
+  try { body = JSON.parse(await readBody(req)); } catch {}
+  const json = (obj, code = 200) => {
+    res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    let r;
+    if (action === 'register') r = await addTenant(body);
+    else if (action === 'update') r = await updateTenant(body);
+    else if (action === 'toggle') r = toggleTenant(body);
+    else if (action === 'remove') r = removeTenant(body);
+    else if (action === 'status') r = getTenant(body);
+    else return json({ ok: false, error: '未知操作' }, 404);
+    json(r, r.ok ? 200 : 400);
+  } catch (e) {
+    console.error('[tenant] 路由异常:', e.message);
+    json({ ok: false, error: '服务端异常，请稍后再试' }, 500);
+  }
+}
+
+const TENANT_ROUTES = {
+  '/api/tenant/register': 'register',
+  '/api/tenant/update': 'update',
+  '/api/tenant/toggle': 'toggle',
+  '/api/tenant/remove': 'remove',
+  '/api/tenant/status': 'status',
+};
+
 const server = createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/chat') {
     return handleChat(req, res);
+  }
+  if (req.method === 'POST' && TENANT_ROUTES[req.url]) {
+    return handleTenant(req, res, TENANT_ROUTES[req.url]);
   }
   if (req.method === 'GET') {
     return serveStatic(req, res);
@@ -102,5 +138,8 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`✅ OnlyRouter 助手网页站已启动：http://localhost:${PORT}`);
+  // 网页进程内同时托管客户 bot：拉起所有已接入租户 + 每周汇总
+  loadAll();
+  startDigestSchedule();
 });
 
