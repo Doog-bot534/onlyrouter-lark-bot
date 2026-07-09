@@ -35,6 +35,61 @@ export async function chat(system, user) {
   return isAnthropic ? callAnthropic(system, user) : callOpenAI(system, user);
 }
 
+// 流式多轮对话（供网页问答站用）：messages 是 [{role:'user'|'assistant', content}...]。
+// 走 anthropic messages stream，逐段文本通过 onDelta 回调吐出。仅支持 -ab 模型（默认 gpt-5.5-ab）。
+// 注意：网页问答不套结构化 JSON（那是给 Lark bot 判 bug 用的），直接出干净 markdown 答案。
+export async function askLLMStream(messages, onDelta) {
+  if (!API_KEY) throw new Error('未配置 ONLYROUTER_API_KEY');
+  const system = await buildSystemPrompt(false); // 网页问答：不套 bug-json，直接出干净 markdown
+  const res = await fetch(`${ROOT}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': API_KEY,
+      authorization: `Bearer ${API_KEY}`,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 3000,
+      temperature: 0.3,
+      system,
+      stream: true,
+      messages,
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`OnlyRouter API ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  // 解析 SSE：按行读取，取 content_block_delta 里的 text_delta
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop() || ''; // 最后一行可能不完整，留到下次
+    for (const line of lines) {
+      const s = line.trim();
+      if (!s.startsWith('data:')) continue;
+      const payload = s.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const evt = JSON.parse(payload);
+        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+          onDelta(evt.delta.text);
+        }
+      } catch {
+        // 忽略非 JSON 行（event: 行等）
+      }
+    }
+  }
+}
+
 // Anthropic Messages 协议（-ab 模型走这条）
 async function callAnthropic(system, question, images = []) {
   // 有图片时用多模态 content（图在前、文字在后）；无图则纯文本

@@ -10,6 +10,7 @@ RUN npm install --omit=dev --no-audit --no-fund
 # 再拷源码和知识库
 COPY src ./src
 COPY knowledge ./knowledge
+COPY web ./web
 
 # data/ 用卷持久化提问记录
 VOLUME ["/app/data"]

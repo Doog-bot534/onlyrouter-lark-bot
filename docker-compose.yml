@@ -13,3 +13,17 @@ services:
       - ./data:/app/data
       # 挂载知识库目录，改文档后重启容器即可生效，无需重建镜像
       - ./knowledge:/app/knowledge:ro
+
+  # 网页问答站：复用同一镜像，改跑 web/server.js，监听 8091（8090 已被占用）
+  web:
+    build: .
+    container_name: onlyrouter-web
+    restart: always
+    env_file: .env
+    environment:
+      - WEB_PORT=8091
+    network_mode: host
+    command: ["node", "web/server.js"]
+    volumes:
+      - ./data:/app/data
+      - ./knowledge:/app/knowledge:ro

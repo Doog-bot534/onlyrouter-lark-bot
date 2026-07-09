@@ -103,31 +103,43 @@ const PERSONA = `你是 OnlyRouter 的群助手机器人，部署在 Lark 群里
 - 不知道答案、或问题明显超出你的知识范围时，直接说不清楚，并建议去 onlyrouter.ai 控制台或找管理员，**绝不编造**具体的接口、参数、价格、模型名。宁可说"我去查一下/建议你找管理员确认"，也不要给可能错的信息。
 - 绝不要在回复里展示或索要别人的 API Key。Key 等于钱，要提醒用户别发群里。
 
+下面是你掌握的全部知识（产品文档 + 实时模型列表），据此回答：`;
+
+// bug 判定的结构化 JSON 指令——仅 Lark bot 需要（要判断并上报 bug）；网页问答不用，直接出干净 markdown。
+const BUG_JSON_INSTRUCTION = `
+
 【重要】你还要判断用户的问题是不是 OnlyRouter 平台本身的 Bug，并按下面的 JSON 格式输出：
 - is_bug=true 仅当：用户描述的现象明显是平台/模型服务端的缺陷（如：正确配置下仍持续 5xx、某模型返回乱码或一直超时、计费明显异常、文档写的接口实际不存在等）。
 - is_bug=false 当：这是用户自己的配置或用法问题（Key 填错、漏带 /v1、模型协议填反、网络问题），或一般咨询、闲聊。判 false 时把 bug_summary 留空。
 - 拿不准时偏向 false——宁可漏报也不要把用法问题误报成 bug 去打扰内部群。
 
 严格只输出一个 JSON 对象，不要加 markdown 代码块包裹，格式：
-{"answer": "给用户看的回复文本", "is_bug": false, "bug_summary": "若 is_bug 为 true，一句话概括这个 bug 的现象和复现条件；否则空字符串"}
-
-下面是你掌握的全部知识（产品文档 + 实时模型列表），据此回答：`;
+{"answer": "给用户看的回复文本", "is_bug": false, "bug_summary": "若 is_bug 为 true，一句话概括这个 bug 的现象和复现条件；否则空字符串"}`;
 
 // system prompt 缓存：DOCS 是常量，models 有 10 分钟缓存，learnings 变化不频繁。
 // 缓存拼好的整串，只在 models 刷新或 learnings 变化时重拼，省掉每条消息的文件读+3万字拼接。
-let promptCache = { text: '', modelsAt: 0, learnLen: -1 };
+// 分两份缓存：带 bug-json（Lark bot）和不带（网页问答）。
+const promptCache = {
+  bot: { text: '', modelsAt: 0, learnLen: -1 },
+  web: { text: '', modelsAt: 0, learnLen: -1 },
+};
 
-export async function buildSystemPrompt() {
+// withBugJson=true（默认，Lark bot 用）拼上 bug 判定的 JSON 指令；
+// false（网页问答用）不拼，直接出干净 markdown。
+export async function buildSystemPrompt(withBugJson = true) {
   const models = await getModelsText();
   const learnings = loadLearnings();
-  // models 时间戳没变 + learnings 长度没变 → 直接返回缓存
-  if (promptCache.text && promptCache.modelsAt === modelsCache.at && promptCache.learnLen === learnings.length) {
-    return promptCache.text;
+  const cache = withBugJson ? promptCache.bot : promptCache.web;
+  if (cache.text && cache.modelsAt === modelsCache.at && cache.learnLen === learnings.length) {
+    return cache.text;
   }
   const learnBlock = learnings
     ? `\n\n---\n\n【你过往沉淀的经验，回答时参考】\n${learnings}`
     : '';
-  const text = `${PERSONA}\n\n${DOCS}\n\n---\n\n${models}${learnBlock}`;
-  promptCache = { text, modelsAt: modelsCache.at, learnLen: learnings.length };
+  const jsonPart = withBugJson ? BUG_JSON_INSTRUCTION : '';
+  const text = `${PERSONA}${jsonPart}\n\n${DOCS}\n\n---\n\n${models}${learnBlock}`;
+  cache.text = text;
+  cache.modelsAt = modelsCache.at;
+  cache.learnLen = learnings.length;
   return text;
 }
