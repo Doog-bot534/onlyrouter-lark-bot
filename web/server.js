@@ -67,10 +67,13 @@ async function handleChat(req, res) {
     return;
   }
 
+  // 关闭 Nagle 算法：每个 SSE delta 立即发出，不等凑包，减少流式卡顿
+  res.socket?.setNoDelay(true);
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // 防 nginx 等反代缓冲 SSE
   });
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
