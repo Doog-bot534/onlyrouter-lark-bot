@@ -27,20 +27,44 @@
     <!-- 左：聊天 -->
     <main class="chat pane" id="chat" data-pane="chat">
       <section class="welcome" id="welcome">
-        <div class="welcome-badge">● 在线</div>
-        <h1 class="welcome-title">有什么可以帮你的？</h1>
-        <p class="welcome-sub">OnlyRouter 使用问题、配置报错、模型怎么选、怎么用 AI 提效 —— 都可以问我。</p>
-        <div class="suggestions" id="suggestions">
-          <button class="chip" data-q="Codex 怎么接入 OnlyRouter？">怎么配 Codex</button>
-          <button class="chip" data-q="OnlyRouter 上有哪些模型，哪个最便宜？">有哪些模型</button>
-          <button class="chip" data-q="调用模型报错 401 是什么原因？">报错怎么办</button>
-          <button class="chip" data-q="怎么用 AI 帮我整理会议纪要？">用 AI 提效</button>
+        <div class="welcome-badge">● 在线 · OnlyRouter AI 助手</div>
+        <h1 class="welcome-title">你好，我是 OnlyRouter 助手 👋</h1>
+        <p class="welcome-sub">
+          我熟悉 OnlyRouter 的<strong>配置接入、报错排查、模型选择</strong>，也能教你<strong>用 AI 提升工作效率</strong>。
+          有问题直接问我，答不上来的我会帮你查。
+        </p>
+
+        <div class="cat-grid">
+          <div class="cat">
+            <div class="cat-head">🔌 配置接入</div>
+            <button class="chip" data-q="Codex 怎么接入 OnlyRouter？">Codex 怎么配</button>
+            <button class="chip" data-q="Claude Code 怎么接入 OnlyRouter？用哪个模型？">Claude Code 怎么配</button>
+            <button class="chip" data-q="OnlyRouter Switch 是什么，怎么用？">Switch 是什么</button>
+          </div>
+          <div class="cat">
+            <div class="cat-head">🐛 报错排查</div>
+            <button class="chip" data-q="调用模型报错 401 是什么原因，怎么解决？">报错 401 怎么办</button>
+            <button class="chip" data-q="报错 400 not configured for responses protocol 是什么意思？">报错 400 协议</button>
+            <button class="chip" data-q="Codex 里用 deepseek 报错说模型不可用，为什么？">Codex 用不了某模型</button>
+          </div>
+          <div class="cat">
+            <div class="cat-head">💰 模型选择</div>
+            <button class="chip" data-q="OnlyRouter 上有哪些模型，日常用哪个最便宜？">哪个模型最便宜</button>
+            <button class="chip" data-q="写代码用哪个模型好？">写代码用啥模型</button>
+          </div>
+          <div class="cat">
+            <div class="cat-head">🚀 AI 提效</div>
+            <button class="chip" data-q="怎么用 AI 帮我整理会议纪要？">整理会议纪要</button>
+            <button class="chip" data-q="怎么用 AI 批量处理 Excel 表格数据？">处理表格数据</button>
+          </div>
         </div>
+
+        <p class="welcome-tips">💡 小提示：问题描述得越具体越好；报错可以直接发<strong>截图</strong>；支持<strong>追问</strong>，聊不明白可以接着说。</p>
       </section>
       <div class="messages" id="messages"></div>
       <div class="composer">
         <div class="composer-inner">
-          <textarea id="input" rows="1" placeholder="问点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
+          <textarea id="input" rows="1" placeholder="问点什么…比如「codex 报错 401 怎么办」（Enter 发送）"></textarea>
           <button id="send" class="send-btn" aria-label="发送">
             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.4 20.4l17.45-7.48a1 1 0 000-1.84L3.4 3.6a.993.993 0 00-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .68.71 1.15 1.39.91z"/></svg>
           </button>

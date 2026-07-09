@@ -152,7 +152,16 @@ export function createTenantBot(cfg) {
       if (Array.isArray(mentions)) for (const m of mentions) if (m.key) question = question.replaceAll(m.key, '').trim();
       const imageKeys = extractImageKeys(message_type, content);
       if (!question && imageKeys.length === 0) {
-        sendText(chat_id, '在的，关于 OnlyRouter 有什么想问的？比如怎么拿 Key、怎么配 Codex、有哪些模型、报错怎么办。').catch(() => {});
+        sendText(chat_id, [
+          '在的 👋 我是 OnlyRouter 助手，可以帮你解决这些：',
+          '',
+          '**🔌 配置接入** — Codex / Claude Code / VS Code 怎么接、Switch 一键配置',
+          '**🐛 报错排查** — 401 / 400 / 协议不通 / 模型不可用等',
+          '**💰 模型选择** — 哪个模型便宜、写代码用哪个、各渠道价格',
+          '**🚀 AI 提效** — 用 AI 整理纪要、处理表格、写文案等',
+          '',
+          '直接把问题发我就行，报错可以发**截图**，也可以接着**追问**～',
+        ].join('\n')).catch(() => {});
         return;
       }
       console.log(`[${label}][msg] ${chat_type} ${message_type}: ${question.slice(0, 50)}${imageKeys.length ? ` [${imageKeys.length}图]` : ''}`);

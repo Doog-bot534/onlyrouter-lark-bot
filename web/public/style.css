@@ -315,12 +315,31 @@ body {
 .faq b { color: var(--text); }
 .deploy-foot { margin-top: 28px; font-size: 12px; color: var(--text-faint); line-height: 1.6; }
 
-/* ===== 移动端：tab 切换单栏 ===== */
-@media (max-width: 900px) {
+/* ===== 聊天欢迎屏 · 细化引导 ===== */
+.welcome-sub strong { color: var(--lime); font-weight: 600; }
+.cat-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+  max-width: 640px; margin: 8px auto 0; text-align: left;
+}
+.cat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.cat-head { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.cat .chip { text-align: left; font-size: 13px; padding: 8px 12px; }
+.welcome-tips {
+  max-width: 640px; margin: 22px auto 0; font-size: 13px; color: var(--text-faint);
+  line-height: 1.7; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 16px; text-align: left;
+}
+.welcome-tips strong { color: var(--text-dim); }
+
+/* ===== 移动端：tab 切换单栏 ===== */@media (max-width: 900px) {
   .layout { display: block; }
   .chat.pane, .deploy.pane { border: none; height: calc(100vh - 62px); }
   .chat.pane[hidden], .deploy.pane[hidden] { display: none; }
   .deploy-inner { padding: 24px 18px 60px; }
+  .cat-grid { grid-template-columns: 1fr; }
 }
 @media (min-width: 901px) {
   /* 桌面：两栏都显示，tab 只是高亮/滚动定位用，不隐藏 */
