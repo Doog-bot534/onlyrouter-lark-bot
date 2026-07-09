@@ -243,7 +243,7 @@ body {
 /* 输入框：内容区与消息区同宽同边距，视觉和谐；更高更宽更醒目 */
 .chat.pane .composer-inner { max-width: 100%; padding: 14px 14px 14px 20px; border-radius: 16px; }
 .chat.pane .composer-inner:focus-within { border-color: var(--lime); box-shadow: 0 0 0 3px var(--lime-dim); }
-.chat.pane #input { font-size: 16px; min-height: 72px; padding: 12px 0; }
+.chat.pane #input { font-size: 16px; min-height: 152px; max-height: 300px; padding: 12px 0; }
 .chat.pane .composer-hint { max-width: 100%; }
 .chat.pane .send-btn { width: 46px; height: 46px; }
 .chat.pane .attach-btn { width: 44px; height: 44px; }
