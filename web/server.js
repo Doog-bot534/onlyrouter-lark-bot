@@ -87,6 +87,7 @@ async function handleChat(req, res) {
     let hint = '抱歉，出了点问题，请稍后再试。';
     if (e.message.includes('401')) hint = '服务端 Key 无效，请联系管理员。';
     else if (e.message.includes('未配置')) hint = '服务端还没配置好，请联系管理员。';
+    else if (e.message.includes('连接') || e.message.includes('fetch') || e.message.includes('timeout')) hint = '网络不太稳定，请再发一次试试 🙏';
     send('error', { message: hint });
   }
   res.end();

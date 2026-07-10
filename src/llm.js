@@ -41,24 +41,33 @@ export async function chat(system, user) {
 export async function askLLMStream(messages, onDelta) {
   if (!API_KEY) throw new Error('未配置 ONLYROUTER_API_KEY');
   const system = await buildSystemPrompt(false); // 网页问答：不套 bug-json，直接出干净 markdown
-  const res = await fetch(`${ROOT}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': API_KEY,
-      authorization: `Bearer ${API_KEY}`,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 3000,
-      temperature: 0.3,
-      system,
-      stream: true,
-      messages,
-    }),
-    signal: AbortSignal.timeout(120000),
+  const reqBody = JSON.stringify({
+    model: MODEL,
+    max_tokens: 3000,
+    temperature: 0.3,
+    system,
+    stream: true,
+    messages,
   });
+  const headers = {
+    'content-type': 'application/json',
+    'x-api-key': API_KEY,
+    authorization: `Bearer ${API_KEY}`,
+    'anthropic-version': '2023-06-01',
+  };
+  // 网络抖动（fetch failed）时自动重试一次，减少用户遇到「临时故障」
+  let res = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      res = await fetch(`${ROOT}/v1/messages`, {
+        method: 'POST', headers, body: reqBody, signal: AbortSignal.timeout(120000),
+      });
+      break; // 拿到响应就跳出（HTTP 错误码在下面处理，不重试）
+    } catch (e) {
+      if (attempt === 2) throw new Error('连接 OnlyRouter 失败，请稍后重试'); // 两次都失败才抛
+      await new Promise((r) => setTimeout(r, 600)); // 等一下再重试
+    }
+  }
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     throw new Error(`OnlyRouter API ${res.status}: ${errText.slice(0, 300)}`);
