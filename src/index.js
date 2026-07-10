@@ -24,5 +24,9 @@ if (LARK_APP_ID && LARK_APP_SECRET) {
 
 startDigestSchedule();
 
+// 进程级兜底：单个 bot/异步异常不拖垮整个进程（否则一个租户/连接报错全体下线）
+process.on('unhandledRejection', (e) => console.error('[进程] 未处理的 Promise 拒绝:', e?.message || e));
+process.on('uncaughtException', (e) => console.error('[进程] 未捕获异常:', e?.message || e));
+
 process.on('SIGINT', () => { console.log('\n👋 退出中…'); process.exit(0); });
 

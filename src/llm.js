@@ -79,34 +79,43 @@ export async function askLLMStream(messages, onDelta) {
   let buf = '';
   let emitted = 0; // 已吐出的字符数
   let streamErr = null; // 流里出现的 error 事件
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split('\n');
-    buf = lines.pop() || ''; // 最后一行可能不完整，留到下次
-    for (const line of lines) {
-      const s = line.trim();
-      if (!s.startsWith('data:')) continue;
-      const payload = s.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
-      try {
-        const evt = JSON.parse(payload);
-        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-          onDelta(evt.delta.text);
-          emitted += evt.delta.text.length;
-        } else if (evt.type === 'error') {
-          // anthropic 流式报错：记下来，流结束后抛出
-          streamErr = evt.error?.message || JSON.stringify(evt.error || evt);
-        }
-      } catch {
-        // 忽略非 JSON 行（event: 行等）
+  // 解析单行 SSE data:，命中 text_delta 就 onDelta；命中 error 记下来
+  const parseLine = (line) => {
+    const s = line.trim();
+    if (!s.startsWith('data:')) return;
+    const payload = s.slice(5).trim();
+    if (!payload || payload === '[DONE]') return;
+    try {
+      const evt = JSON.parse(payload);
+      if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+        onDelta(evt.delta.text);
+        emitted += evt.delta.text.length;
+      } else if (evt.type === 'error') {
+        streamErr = evt.error?.message || JSON.stringify(evt.error || evt);
       }
+    } catch {
+      // 忽略非 JSON 行（event: 行等）
     }
+  };
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || ''; // 最后一行可能不完整，留到下次
+      for (const line of lines) parseLine(line);
+    }
+    if (buf) parseLine(buf); // 处理末尾残留（无换行收尾的最后一段）
+  } finally {
+    reader.cancel().catch(() => {}); // 任何路径都释放连接，避免泄漏
   }
-  // 流结束但一个字都没吐：把错误信息抛出去，让上层给用户有用的提示
-  if (emitted === 0) {
-    throw new Error(streamErr ? `模型返回错误：${streamErr}` : '模型这次没有返回内容（可能是临时故障）');
+  // 流里报了错：一个字没吐就抛（上层给提示）；已吐了部分则补一句"未完整"标记，别伪装成完整
+  if (streamErr) {
+    if (emitted === 0) throw new Error(`模型返回错误：${streamErr}`);
+    onDelta('\n\n_（回答未完整，可能因临时故障中断，建议重发）_');
+  } else if (emitted === 0) {
+    throw new Error('模型这次没有返回内容（可能是临时故障）');
   }
   return emitted;
 }

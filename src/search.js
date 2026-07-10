@@ -16,13 +16,15 @@ export function searchEnabled() {
 // 靠本地文档就能答，不该无条件联网（每次联网最长阻塞数秒，是主要延迟来源）。
 // 只有出现「需要外部/最新信息」的信号时才搜。零成本，不额外调 LLM。
 const SEARCH_SIGNALS = [
-  '最新', '最近', '今天', '现在', '目前', '20', // 年份/时效
+  '最新', '最近', '今天', '现在', '目前', // 时效
   '为什么', '报错', '错误', 'error', 'failed', '失败', '不行', '不能用', '连不上', // 疑难排查
   '对比', '区别', '哪个好', '还是', '相比', // 比较
   '其他工具', '别的', '除了', '业界', '市面', 'competitor', '竞品',
 ];
 function worthSearching(query) {
   const q = (query || '').toLowerCase();
+  // 年份（20xx）单独用正则判，避免像早先的 '20' 那样命中任意含 20 的数字
+  if (/20\d{2}/.test(q)) return true;
   return SEARCH_SIGNALS.some((s) => q.includes(s.toLowerCase()));
 }
 

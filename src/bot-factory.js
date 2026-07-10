@@ -165,7 +165,10 @@ export function createTenantBot(cfg) {
         return;
       }
       console.log(`[${label}][msg] ${chat_type} ${message_type}: ${question.slice(0, 50)}${imageKeys.length ? ` [${imageKeys.length}图]` : ''}`);
-      handleQuestion(chat_id, chat_type, question, message_id, imageKeys);
+      // fire-and-forget，但兜底 catch，防止任何漏网异常变成 unhandledRejection
+      handleQuestion(chat_id, chat_type, question, message_id, imageKeys).catch((e) =>
+        console.error(`[${label}][handle] 未捕获:`, e?.message || e)
+      );
     },
   });
 
@@ -173,9 +176,17 @@ export function createTenantBot(cfg) {
     tenantId,
     label,
     start() {
-      wsClient = new Lark.WSClient({ ...baseConfig, loggerLevel: Lark.LoggerLevel.warn });
-      wsClient.start({ eventDispatcher });
-      console.log(`✅ [${label}] bot 已启动（长连接）`);
+      try {
+        wsClient = new Lark.WSClient({ ...baseConfig, loggerLevel: Lark.LoggerLevel.warn });
+        // 防御性挂 error 监听：长连接底层 socket 报错若无监听会 crash 整个进程
+        if (typeof wsClient.on === 'function') {
+          wsClient.on('error', (e) => console.error(`[${label}][ws] 连接错误:`, e?.message || e));
+        }
+        wsClient.start({ eventDispatcher });
+        console.log(`✅ [${label}] bot 已启动（长连接）`);
+      } catch (e) {
+        console.error(`[${label}] bot 启动失败:`, e?.message || e);
+      }
     },
     stop() {
       // SDK 无显式 close，置空让长连接随实例回收；重连由新实例接管

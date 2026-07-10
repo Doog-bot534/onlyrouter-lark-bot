@@ -139,8 +139,13 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`✅ OnlyRouter 助手网页站已启动：http://localhost:${PORT}`);
-  // 网页进程内同时托管客户 bot：拉起所有已接入租户 + 每周汇总
+  // 网页进程托管客户 bot（拉起所有已接入租户）。
+  // 注意：每周汇总 cron 只在 bot 容器（src/index.js）跑，这里不再调 startDigestSchedule，
+  // 否则两个进程各起一份 cron 会导致周报重复发送。
   loadAll();
-  startDigestSchedule();
 });
+
+// 进程级兜底：任一租户 bot/异步异常不拖垮整个 web 进程（否则全部客户 bot 同时下线）
+process.on('unhandledRejection', (e) => console.error('[进程] 未处理的 Promise 拒绝:', e?.message || e));
+process.on('uncaughtException', (e) => console.error('[进程] 未捕获异常:', e?.message || e));
 

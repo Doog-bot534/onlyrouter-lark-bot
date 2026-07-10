@@ -39,8 +39,14 @@ async function getModelsText() {
   }
   try {
     const res = await fetch(MODELS_API, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`models API ${res.status}`); // 坏响应别往下走，避免缓存空列表
     const json = await res.json();
     const list = json.data || [];
+    // 拉到空列表：不覆盖已有缓存（宁可用旧的也别让 system prompt 模型列表空掉 10 分钟）
+    if (list.length === 0) {
+      console.error('[knowledge] 模型列表为空，保留旧缓存');
+      return modelsCache.text || '（模型列表暂时拉取失败，可引导用户去 onlyrouter.ai/models 查看）';
+    }
     // 只保留对回答有用的字段，按类型分组，控制 token 量
     const byType = {};
     for (const m of list) {
@@ -120,17 +126,25 @@ const BUG_JSON_INSTRUCTION = `
 // 缓存拼好的整串，只在 models 刷新或 learnings 变化时重拼，省掉每条消息的文件读+3万字拼接。
 // 分两份缓存：带 bug-json（Lark bot）和不带（网页问答）。
 const promptCache = {
-  bot: { text: '', modelsAt: 0, learnLen: -1 },
-  web: { text: '', modelsAt: 0, learnLen: -1 },
+  bot: { text: '', modelsAt: 0, learnHash: '' },
+  web: { text: '', modelsAt: 0, learnHash: '' },
 };
+
+// 轻量内容哈希（djb2）——用内容而非长度判缓存失效：经验被替换/编辑但字数相同也能识别到变化
+function quickHash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return String(h);
+}
 
 // withBugJson=true（默认，Lark bot 用）拼上 bug 判定的 JSON 指令；
 // false（网页问答用）不拼，直接出干净 markdown。
 export async function buildSystemPrompt(withBugJson = true) {
   const models = await getModelsText();
   const learnings = loadLearnings();
+  const learnHash = quickHash(learnings);
   const cache = withBugJson ? promptCache.bot : promptCache.web;
-  if (cache.text && cache.modelsAt === modelsCache.at && cache.learnLen === learnings.length) {
+  if (cache.text && cache.modelsAt === modelsCache.at && cache.learnHash === learnHash) {
     return cache.text;
   }
   const learnBlock = learnings
@@ -140,6 +154,6 @@ export async function buildSystemPrompt(withBugJson = true) {
   const text = `${PERSONA}${jsonPart}\n\n${DOCS}\n\n---\n\n${models}${learnBlock}`;
   cache.text = text;
   cache.modelsAt = modelsCache.at;
-  cache.learnLen = learnings.length;
+  cache.learnHash = learnHash;
   return text;
 }

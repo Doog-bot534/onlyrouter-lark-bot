@@ -18,10 +18,11 @@ const WEBHOOK_URL = process.env.LARK_FEEDBACK_WEBHOOK_URL || process.env.LARK_RE
 const DIGEST_CRON = process.env.FEEDBACK_DIGEST_CRON || '7 10 * * 1';
 
 // ---- 记录一条提问（每条消息都记，无论是否 bug）----
-export function logQuestion({ question, chatType, chatId, answer, isBug }) {
+export function logQuestion({ question, chatType, chatId, answer, isBug, tenantId }) {
   try {
     const line = JSON.stringify({
       ts: new Date().toISOString(),
+      tenantId: tenantId || 'official', // 记录来源租户，便于按租户看反馈
       chatType,
       chatId,
       question,
