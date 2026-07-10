@@ -373,7 +373,12 @@ body {
 
 /* ===== 移动端：tab 切换单栏 ===== */@media (max-width: 900px) {
   .layout { display: block; }
-  .chat.pane, .deploy.pane { border: none; height: calc(100vh - 62px); }
+  .deploy.pane { border: none; height: calc(100vh - 62px); }
+  /* 聊天：整页自然滚动，输入框吸底固定可见（sticky bottom） */
+  .chat.pane { border: none; display: block; height: auto; min-height: calc(100vh - 62px); overflow: visible; }
+  .chat.pane .messages { display: block; overflow: visible; padding-bottom: 8px; }
+  .chat.pane .welcome { flex-shrink: 0; }
+  .chat.pane .composer { position: sticky; bottom: 0; z-index: 5; background: var(--bg); }
   .chat.pane[hidden], .deploy.pane[hidden] { display: none; }
   .deploy-inner { padding: 24px 18px 60px; }
   .cat-grid { grid-template-columns: 1fr; }
