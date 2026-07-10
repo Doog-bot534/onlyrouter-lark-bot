@@ -379,6 +379,8 @@ body {
   .chat.pane .messages { display: block; overflow: visible; padding-bottom: 8px; }
   .chat.pane .welcome { flex-shrink: 0; }
   .chat.pane .composer { position: sticky; bottom: 0; z-index: 5; background: var(--bg); }
+  .chat.pane #input { font-size: 14.5px; min-height: 40px; }
+  .chat.pane .composer-hint { font-size: 11px; }
   .chat.pane[hidden], .deploy.pane[hidden] { display: none; }
   .deploy-inner { padding: 24px 18px 60px; }
   .cat-grid { grid-template-columns: 1fr; }
