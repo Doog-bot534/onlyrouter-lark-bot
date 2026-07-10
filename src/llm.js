@@ -55,17 +55,18 @@ export async function askLLMStream(messages, onDelta) {
     authorization: `Bearer ${API_KEY}`,
     'anthropic-version': '2023-06-01',
   };
-  // 网络抖动（fetch failed）时自动重试一次，减少用户遇到「临时故障」
+  // 偶发连接失败（fetch failed / connect timeout）时自动重试，最多 3 次，避免一次抖动就报错。
+  // 90s 整体上限防止无限 loading（正常回答 12-20s，够用）。
   let res = null;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       res = await fetch(`${ROOT}/v1/messages`, {
-        method: 'POST', headers, body: reqBody, signal: AbortSignal.timeout(120000),
+        method: 'POST', headers, body: reqBody, signal: AbortSignal.timeout(90000),
       });
       break; // 拿到响应就跳出（HTTP 错误码在下面处理，不重试）
     } catch (e) {
-      if (attempt === 2) throw new Error('连接 OnlyRouter 失败，请稍后重试'); // 两次都失败才抛
-      await new Promise((r) => setTimeout(r, 600)); // 等一下再重试
+      if (attempt === 3) throw new Error('连接 OnlyRouter 失败，请稍后重试'); // 三次都失败才抛
+      await new Promise((r) => setTimeout(r, 400)); // 短暂等待再重试
     }
   }
   if (!res.ok) {
