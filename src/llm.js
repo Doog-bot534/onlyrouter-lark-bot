@@ -67,6 +67,8 @@ export async function askLLMStream(messages, onDelta) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
+  let emitted = 0; // 已吐出的字符数
+  let streamErr = null; // 流里出现的 error 事件
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -82,12 +84,21 @@ export async function askLLMStream(messages, onDelta) {
         const evt = JSON.parse(payload);
         if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
           onDelta(evt.delta.text);
+          emitted += evt.delta.text.length;
+        } else if (evt.type === 'error') {
+          // anthropic 流式报错：记下来，流结束后抛出
+          streamErr = evt.error?.message || JSON.stringify(evt.error || evt);
         }
       } catch {
         // 忽略非 JSON 行（event: 行等）
       }
     }
   }
+  // 流结束但一个字都没吐：把错误信息抛出去，让上层给用户有用的提示
+  if (emitted === 0) {
+    throw new Error(streamErr ? `模型返回错误：${streamErr}` : '模型这次没有返回内容（可能是临时故障）');
+  }
+  return emitted;
 }
 
 // Anthropic Messages 协议（-ab 模型走这条）
